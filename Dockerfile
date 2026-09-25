@@ -9,12 +9,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY beets_mvp ./beets_mvp
 
 RUN useradd --create-home --uid 10001 app \
-    && mkdir -p /data/inbox /data/library /data/state \
+    && mkdir -p /data/inbox /data/library /data/config \
     && chown -R app:app /data /app
 USER app
 
 ENV INBOX_PATH=/data/inbox \
     LIBRARY_PATH=/data/library \
-    STATE_PATH=/data/state
-EXPOSE 8000
-CMD ["gunicorn", "--bind=0.0.0.0:8000", "--workers=1", "--threads=4", "beets_mvp:create_app()"]
+    STATE_PATH=/data/config
+EXPOSE 8788
+CMD ["gunicorn", "--bind=0.0.0.0:8788", "--workers=1", "--threads=4", "beets_mvp:create_app()"]

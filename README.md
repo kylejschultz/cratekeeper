@@ -11,11 +11,13 @@ Requirements: Docker Engine with the Compose plugin.
 ```sh
 git clone https://github.com/kylejschultz/cratekeeper.git
 cd cratekeeper
-mkdir -p data/inbox data/library data/state
+mkdir -p data/inbox data/library data/config
 APP_UID="$(id -u)" APP_GID="$(id -g)" docker compose up -d
 ```
 
-Open <http://localhost:8000>. Put albums or individual audio files in `data/inbox`. Imported files are moved to `data/library`; application and beets databases are stored in `data/state`.
+Open <http://localhost:8788>. Put albums or individual audio files in `data/inbox`. Imported files are moved to `data/library`; application and beets databases are stored in `data/config`.
+
+When upgrading an existing Compose installation, stop the container and move the contents of `data/state` to `data/config` before starting the new image. The database filenames and formats are unchanged.
 
 The compose file uses `ghcr.io/kylejschultz/cratekeeper:latest` and also includes a local build definition. To build from your checkout, run `docker compose up -d --build`. On systems where `id` is unavailable, Compose defaults to UID/GID 1000.
 
@@ -24,12 +26,12 @@ The compose file uses `ghcr.io/kylejschultz/cratekeeper:latest` and also include
 Create an **Add Container** entry with these settings:
 
 - **Repository:** `ghcr.io/kylejschultz/cratekeeper:latest`
-- **Web UI:** `http://[IP]:[PORT:8000]/`
-- **Port:** container `8000`, mapped to a host port of your choice
+- **Web UI:** `http://[IP]:[PORT:8788]/`
+- **Port:** container `8788`, mapped to a host port of your choice
 - **Paths:**
   - `/data/inbox` → an inbox share
   - `/data/library` → your music library share
-  - `/data/state` → `/mnt/user/appdata/cratekeeper`
+  - `/data/config` → `/mnt/user/appdata/cratekeeper`
 - **Variables:** set `SECRET_KEY` to a long random value; optionally configure the Navidrome variables below
 
 The container runs as UID 10001 by default. Ensure the mapped directories are writable by that UID, or use Unraid's container advanced settings to set an appropriate numeric user such as `99:100`.
@@ -42,14 +44,14 @@ Python 3.11 or newer is recommended.
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements-dev.txt
-mkdir -p data/inbox data/library data/state
+mkdir -p data/inbox data/library data/config
 flask --app beets_mvp run --debug
 ```
 
 For a production-like local process:
 
 ```sh
-gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 'beets_mvp:create_app()'
+gunicorn --bind 127.0.0.1:8788 --workers 1 --threads 4 'beets_mvp:create_app()'
 ```
 
 ## Configuration
@@ -58,7 +60,7 @@ gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 'beets_mvp:create_app()'
 |---|---|---|
 | `INBOX_PATH` | `./data/inbox` | Music staging directory. |
 | `LIBRARY_PATH` | `./data/library` | Managed beets music library. |
-| `STATE_PATH` | `./data/state` | SQLite databases and generated beets config. |
+| `STATE_PATH` | `./data/config` | SQLite databases and generated beets config. |
 | `BEETS_CONFIG` | `$STATE_PATH/config.yaml` | Existing beets YAML config; a minimal config is generated when absent. |
 | `SECRET_KEY` | development-only value | Flask signing key. Set a random value for normal use. |
 | `NAVIDROME_RESCAN_URL` | unset | Full URL that accepts a POST request to trigger scanning. |
@@ -69,9 +71,9 @@ gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 'beets_mvp:create_app()'
 Imports require a preview followed by an explicit execute call:
 
 ```sh
-curl -sS -X POST http://localhost:8000/api/imports/preview \
+curl -sS -X POST http://localhost:8788/api/imports/preview \
   -H 'Content-Type: application/json' -d '{"path":"My Album"}'
-curl -sS -X POST http://localhost:8000/api/imports/1/execute
+curl -sS -X POST http://localhost:8788/api/imports/1/execute
 ```
 
 Execution verifies that the previewed files have not changed, then runs `beet import --quiet --noautotag --move`.
@@ -98,4 +100,4 @@ python -m compileall -q beets_mvp tests
 - Imports use existing tags (`--noautotag`); there is no MusicBrainz matching, duplicate-resolution UI, artwork workflow, progress stream, undo, or delete endpoint.
 - A metadata database update occurs before its file-tag write, so a failed tag write can leave them temporarily inconsistent. Keep backups and ensure library files are writable.
 - Navidrome integration is a generic POST with optional bearer authentication and is not automatically run after imports.
-- The generated beets config is not overwritten. If storage paths change, update or remove the state config intentionally.
+- The generated beets config is not overwritten. If storage paths change, update or remove the config intentionally.

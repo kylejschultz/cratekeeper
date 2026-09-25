@@ -23,7 +23,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SECRET_KEY=os.getenv("SECRET_KEY", "local-development-only"),
         INBOX_PATH=os.getenv("INBOX_PATH", str(Path.cwd() / "data/inbox")),
         LIBRARY_PATH=os.getenv("LIBRARY_PATH", str(Path.cwd() / "data/library")),
-        STATE_PATH=os.getenv("STATE_PATH", str(Path.cwd() / "data/state")),
+        STATE_PATH=os.getenv("STATE_PATH", str(Path.cwd() / "data/config")),
         NAVIDROME_RESCAN_URL=os.getenv("NAVIDROME_RESCAN_URL", ""),
         NAVIDROME_TOKEN=os.getenv("NAVIDROME_TOKEN", ""),
     )
