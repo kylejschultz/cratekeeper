@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Beets inbox</title>
+  <style>
+    body { font: 16px system-ui; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+    th, td { border-bottom: 1px solid #ddd; padding: .5rem; text-align: left; }
+    input { width: 9rem; } code { background: #eee; padding: .15rem .3rem; }
+    .flash { background: #def7e5; padding: .75rem; }
+  </style>
+</head>
+<body>
+  <h1>Beets inbox</h1>
+  <p>Preview imports through <code>POST /api/imports/preview</code>, then execute the returned job.</p>
+  {% for message in get_flashed_messages() %}<p class="flash">{{ message }}</p>{% endfor %}
+  <h2>Inbox</h2>
+  <table><thead><tr><th>Selection</th><th>Audio files</th><th>Bytes</th></tr></thead><tbody>
+  {% for candidate in candidates %}<tr><td>{{ candidate.path }}</td><td>{{ candidate.files }}</td><td>{{ candidate.bytes }}</td></tr>
+  {% else %}<tr><td colspan="3">Inbox is empty.</td></tr>{% endfor %}
+  </tbody></table>
+  <h2>Library</h2>
+  <table><thead><tr><th>ID</th><th>Metadata (editing writes database and file tags)</th></tr></thead><tbody>
+  {% for item in items %}<tr><td>{{ item.id }}</td><td>
+    <form method="post" action="{{ url_for('edit_item', item_id=item.id) }}">
+      {% for field in ('title','artist','album','albumartist','genre','year','track','disc') %}
+      <label>{{ field }} <input name="{{ field }}" value="{{ item[field] or '' }}"></label>
+      {% endfor %}<button>Save</button>
+    </form>
+  </td></tr>{% else %}<tr><td colspan="2">Library is empty.</td></tr>{% endfor %}
+  </tbody></table>
+</body>
+</html>
