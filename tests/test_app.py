@@ -2,7 +2,6 @@ from pathlib import Path
 
 from beets_mvp import create_app
 
-
 def make_app(tmp_path: Path):
     app = create_app({
         "TESTING": True,
@@ -17,7 +16,6 @@ def make_app(tmp_path: Path):
     assert response.status_code == 302
     return app
 
-
 def test_health_and_empty_lists(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()
@@ -28,6 +26,51 @@ def test_health_and_empty_lists(tmp_path):
     assert app.config["BEETS_DB"] == str(tmp_path / "config" / "library.db")
     assert app.config["BEETS_CONFIG"] == str(tmp_path / "config" / "config.yaml")
 
+def test_index_renders_app_shell_navigation_and_sections(tmp_path):
+    page = make_app(tmp_path).test_client().get("/")
+
+    assert page.status_code == 200
+    assert b'id="sidebar"' in page.data
+    assert b'aria-label="Primary navigation"' in page.data
+    assert b'href="#overview"' in page.data
+    assert b'href="#inbox"' in page.data
+    assert b'href="#library"' in page.data
+    assert b'href="/settings"' in page.data
+    assert b'id="overview-title"' in page.data
+    assert b'id="inbox-title"' in page.data
+    assert b'id="library-title"' in page.data
+    assert b'Inbox is empty' in page.data
+    assert b'Library is empty' in page.data
+    assert b'src="/static/cratekeep-logo.png"' in page.data
+    assert b'aria-controls="sidebar"' in page.data
+
+def test_index_renders_inbox_data_and_library_edit_form(tmp_path, monkeypatch):
+    app = make_app(tmp_path)
+    monkeypatch.setattr(
+        "beets_mvp._inbox_candidates",
+        lambda current_app: [{"path": "new-album", "files": 2, "bytes": 4096}],
+    )
+    item = {
+        "id": 7,
+        "title": "Example track",
+        "artist": "Example artist",
+        "album": "Example album",
+        "albumartist": "Example artist",
+        "genre": "Rock",
+        "year": 2026,
+        "track": 1,
+        "disc": 1,
+    }
+    monkeypatch.setattr("beets_mvp._items", lambda current_app: [item])
+
+    page = app.test_client().get("/")
+
+    assert b"new-album" in page.data
+    assert b"2 audio files waiting" in page.data
+    assert b"Example track" in page.data
+    assert b'action="/api/items/7"' in page.data
+    assert b'name="title" value="Example track"' in page.data
+    assert b"Save changes" in page.data
 
 def test_default_state_path_uses_config_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -41,7 +84,6 @@ def test_default_state_path_uses_config_directory(tmp_path, monkeypatch):
     assert app.config["BEETS_DB"] == str(tmp_path / "data" / "config" / "library.db")
     assert app.config["BEETS_CONFIG"] == str(tmp_path / "data" / "config" / "config.yaml")
 
-
 def test_secret_key_is_generated_and_persisted(tmp_path, monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
     state_path = tmp_path / "config"
@@ -54,12 +96,10 @@ def test_secret_key_is_generated_and_persisted(tmp_path, monkeypatch):
     restarted = create_app({"TESTING": True, "STATE_PATH": str(state_path)})
     assert restarted.config["SECRET_KEY"] == key
 
-
 def test_explicit_secret_key_overrides_generated_key(tmp_path):
     app = create_app({"TESTING": True, "STATE_PATH": str(tmp_path / "config"), "SECRET_KEY": "explicit"})
 
     assert app.config["SECRET_KEY"] == "explicit"
-
 
 def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
     monkeypatch.setenv("INBOX_PATH", "/ignored/inbox")
@@ -94,7 +134,6 @@ def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
     assert restarted.config["NAVIDROME_TOKEN"] == "secret-token"
     assert restarted.test_client().get("/").status_code == 200
 
-
 def test_browse_is_limited_to_configured_mount_roots(tmp_path):
     mounted = tmp_path / "mounted"
     (mounted / "inbox").mkdir(parents=True)
@@ -112,7 +151,6 @@ def test_browse_is_limited_to_configured_mount_roots(tmp_path):
     assert root.status_code == 200
     assert {entry["name"] for entry in root.json["entries"]} == {"inbox", "library"}
     assert client.get(f"/api/browse?path={outside}").status_code == 400
-
 
 def test_browse_exposes_and_navigates_each_mounted_root(tmp_path):
     first = tmp_path / "first-mount"
@@ -137,7 +175,6 @@ def test_browse_exposes_and_navigates_each_mounted_root(tmp_path):
     assert other_root.json["path"] == str(second)
     assert other_root.json["parent"] is None
     assert other_root.json["entries"] == [{"name": "music", "path": str(second / "music")}]
-
 
 def test_setup_uses_compact_logo_typeable_paths_and_modal_browser(tmp_path):
     app = create_app({
@@ -167,7 +204,6 @@ def test_setup_uses_compact_logo_typeable_paths_and_modal_browser(tmp_path):
     assert logo.status_code == 200
     assert logo.mimetype == "image/png"
 
-
 def test_settings_update_paths_and_preserve_or_clear_token(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()
@@ -194,7 +230,6 @@ def test_settings_update_paths_and_preserve_or_clear_token(tmp_path):
         "clear_navidrome_token": "1",
     })
     assert app.config["NAVIDROME_TOKEN"] == ""
-
 
 def test_review_then_import(tmp_path, monkeypatch):
     app = make_app(tmp_path)
@@ -223,7 +258,6 @@ def test_review_then_import(tmp_path, monkeypatch):
     assert executed.status_code == 200
     assert executed.json["status"] == "complete"
     assert seen["command"][-2:] == ["--move", str(album)]
-
 
 def test_rejects_path_escape(tmp_path):
     client = make_app(tmp_path).test_client()
