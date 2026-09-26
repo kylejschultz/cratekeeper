@@ -157,6 +157,10 @@ def test_setup_uses_compact_logo_typeable_paths_and_modal_browser(tmp_path):
     assert b'id="browser-breadcrumbs"' in page.data
     assert b'id="browser-search"' in page.data
     assert b'id="browser-path-form"' in page.data
+    assert b'id="browser-root"' not in page.data
+    assert b'id="browser-root-button"' not in page.data
+    assert page.data.index(b'id="browser-breadcrumbs"') < page.data.index(b'id="browser-up"')
+    assert page.data.index(b'id="browser-up"') < page.data.index(b'id="browser-path-form"')
     assert b"event.key === 'Escape'" in page.data
     assert b"fetch('/api/browse?path='" in page.data
     logo = client.get("/static/cratekeep-logo.png")

@@ -18,6 +18,12 @@
       --success: #dcefe5;
       --error: #f7dddd;
       --overlay: rgb(12 27 38 / 68%);
+      --modal-surface: #f7f8f8;
+      --modal-panel: #fff;
+      --modal-border: #cbd3d8;
+      --modal-subtle: #edf1f3;
+      --modal-accent: #4f7185;
+      --modal-accent-hover: #3f6073;
     }
     * { box-sizing: border-box; }
     body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1.5rem; color: var(--text); background: var(--page); }
@@ -39,35 +45,38 @@
     .error { background: var(--error); }
     .browser[hidden] { display: none; }
     .browser { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 1rem; background: var(--overlay); }
-    .browser-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: min(720px, calc(100vh - 2rem)); overflow: hidden; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); box-shadow: 0 1.25rem 4rem rgb(5 20 30 / 35%); }
-    .browser-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--accent); color: #fff; }
+    .browser-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: min(720px, calc(100vh - 2rem)); overflow: hidden; border: 1px solid var(--modal-border); border-radius: .7rem; background: var(--modal-surface); box-shadow: 0 1.25rem 4rem rgb(5 20 30 / 28%); }
+    .browser-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--modal-border); background: var(--modal-surface); color: var(--text); }
     .browser-header h2 { margin: 0; font-size: 1.15rem; }
     .browser-close { min-width: 2.25rem; padding: .25rem .55rem; border-color: transparent; background: transparent; color: inherit; font-size: 1.4rem; line-height: 1; }
-    .browser-close:hover { background: rgb(255 255 255 / 16%); }
+    .browser-close:hover { background: var(--modal-subtle); color: var(--text); }
     .browser-body { min-height: 0; overflow: auto; padding: 1rem 1.25rem; }
-    .browser-toolbar { display: grid; grid-template-columns: auto minmax(9rem, 1fr) auto; gap: .5rem; }
-    .browser-toolbar button, .browser-toolbar select { margin: 0; }
-    .browser-toolbar select { min-width: 0; }
+    .browser-body button:not(.directory-row) { border-color: var(--modal-accent); background: var(--modal-accent); }
+    .browser-body button:not(.directory-row):hover { background: var(--modal-accent-hover); }
+    .browser-up-row { margin: .2rem 0 .75rem; }
+    .browser-up-row button { margin: 0; }
     .browser-path-form { display: flex; gap: .5rem; margin-top: .75rem; }
     .browser-path-form input { flex: 1; min-width: 0; margin: 0; }
     .browser-path-form button { margin: 0; }
-    .breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: .15rem; min-height: 2.25rem; margin: .55rem 0; }
-    .breadcrumb { margin: 0; padding: .2rem .35rem; border-color: transparent; background: transparent; color: var(--accent); }
-    .breadcrumb:hover { background: var(--page); color: var(--accent-hover); }
+    .breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: .15rem; min-height: 2.25rem; margin: 0; }
+    .browser-body .breadcrumb { margin: 0; padding: .2rem .35rem; border-color: transparent; background: transparent; color: var(--modal-accent); }
+    .browser-body .breadcrumb:hover { background: var(--modal-subtle); color: var(--modal-accent-hover); }
     .breadcrumb-separator { color: var(--muted); }
     .browser-search { margin: 0 0 .65rem; }
-    .directory-list { min-height: 15rem; overflow-y: auto; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); }
-    .directory-row { display: grid; grid-template-columns: 1.75rem 1fr auto; align-items: center; width: 100%; margin: 0; padding: .7rem .85rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); text-align: left; }
+    .directory-list { min-height: 15rem; overflow-y: auto; border: 1px solid var(--modal-border); border-radius: .4rem; background: var(--modal-panel); }
+    .directory-row { display: grid; grid-template-columns: 1.75rem 1fr auto; align-items: center; width: 100%; margin: 0; padding: .7rem .85rem; border: 0; border-bottom: 1px solid var(--modal-border); border-radius: 0; background: transparent; color: var(--text); text-align: left; }
     .directory-row:last-child { border-bottom: 0; }
-    .directory-row:hover, .directory-row:focus-visible { background: var(--page); color: var(--text); }
-    .directory-row[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
-    .folder-icon { color: var(--accent); font-size: 1.1rem; }
+    .directory-row:hover, .directory-row:focus-visible { background: var(--modal-subtle); color: var(--text); }
+    .directory-row[aria-selected="true"] { background: color-mix(in srgb, var(--modal-accent) 12%, var(--modal-panel)); }
+    .folder-icon { color: var(--modal-accent); font-size: 1.1rem; }
     .directory-open { color: var(--muted); font-size: .85rem; }
     .browser-status { min-height: 1.5rem; margin: .5rem 0 0; color: var(--muted); }
     .browser-status.error-text { color: #a52b35; }
-    .browser-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin: 0; padding: .85rem 1.25rem; border-top: 1px solid var(--border); background: var(--page); }
-    .browser-actions .secondary { border-color: var(--border); background: var(--surface); color: var(--text); }
-    .browser-actions .secondary:hover { background: var(--page); }
+    .browser-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin: 0; padding: .85rem 1.25rem; border-top: 1px solid var(--modal-border); background: var(--modal-subtle); }
+    .browser-actions button:not(.secondary) { border-color: var(--modal-accent); background: var(--modal-accent); }
+    .browser-actions button:not(.secondary):hover { background: var(--modal-accent-hover); }
+    .browser-actions .secondary { border-color: var(--modal-border); background: var(--modal-panel); color: var(--text); }
+    .browser-actions .secondary:hover { background: var(--modal-surface); }
     body.modal-open { overflow: hidden; }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -81,11 +90,16 @@
         --focus: #70c7fa;
         --success: #244b3a;
         --error: #572f35;
+        --modal-surface: #222b31;
+        --modal-panel: #29343b;
+        --modal-border: #526169;
+        --modal-subtle: #303c43;
+        --modal-accent: #759aae;
+        --modal-accent-hover: #5f879d;
       }
       button { color: #10202a; }
       button:hover { color: #fff; }
-      .browser-header { color: #10202a; }
-      .browser-close:hover { color: #10202a; }
+      .browser-body button:not(.directory-row), .browser-actions button:not(.secondary) { color: #10202a; }
       .browser-status.error-text { color: #ffadb5; }
     }
     @media (max-width: 520px) {
@@ -93,8 +107,6 @@
       .path-picker { align-items: stretch; flex-direction: column; }
       .browser { padding: .4rem; }
       .browser-dialog { max-height: calc(100vh - .8rem); }
-      .browser-toolbar { grid-template-columns: auto 1fr; }
-      .browser-toolbar select { grid-column: 1 / -1; grid-row: 2; }
       .browser-path-form { align-items: stretch; flex-direction: column; }
       .directory-list { min-height: 11rem; }
     }
@@ -144,20 +156,18 @@
   <div id="browser" class="browser" hidden>
     <section class="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="browser-title" tabindex="-1">
       <header class="browser-header">
-        <h2 id="browser-title">Select a mounted directory</h2>
+        <h2 id="browser-title">Select a directory</h2>
         <button type="button" class="browser-close" id="browser-close-icon" aria-label="Close directory browser">&times;</button>
       </header>
       <div class="browser-body">
-        <div class="browser-toolbar">
+        <nav id="browser-breadcrumbs" class="breadcrumbs" aria-label="Current directory breadcrumbs"></nav>
+        <div class="browser-up-row">
           <button type="button" id="browser-up" aria-label="Go to parent directory">&#8593; Up</button>
-          <select id="browser-root" aria-label="Mounted root"></select>
-          <button type="button" id="browser-root-button">Root</button>
         </div>
         <form id="browser-path-form" class="browser-path-form">
           <input id="browser-path" type="text" aria-label="Current directory path" autocomplete="off" spellcheck="false">
           <button type="submit">Go</button>
         </form>
-        <nav id="browser-breadcrumbs" class="breadcrumbs" aria-label="Current directory breadcrumbs"></nav>
         <input id="browser-search" class="browser-search" type="search" placeholder="Filter directories" aria-label="Filter directories" autocomplete="off">
         <div id="browser-entries" class="directory-list" role="listbox" aria-label="Directories" tabindex="-1"></div>
         <p id="browser-status" class="browser-status" aria-live="polite"></p>
@@ -174,7 +184,6 @@
     const dialog = browser.querySelector('.browser-dialog');
     const browserPath = document.getElementById('browser-path');
     const breadcrumbs = document.getElementById('browser-breadcrumbs');
-    const rootSelect = document.getElementById('browser-root');
     const entries = document.getElementById('browser-entries');
     const search = document.getElementById('browser-search');
     const status = document.getElementById('browser-status');
@@ -263,11 +272,8 @@
         directoryEntries = data.entries;
         selectedPath = null;
         browserPath.value = currentPath;
-        rootSelect.replaceChildren(...data.roots.map(root => new Option(root.name || root.path, root.path)));
         activeRoot = data.roots.find(root => currentPath === root.path || currentPath.startsWith(root.path.replace(/\/$/, '') + '/')) || data.roots[0];
-        if (activeRoot) rootSelect.value = activeRoot.path;
         document.getElementById('browser-up').disabled = !parentPath;
-        document.getElementById('browser-root-button').disabled = !activeRoot || currentPath === activeRoot.path;
         search.value = '';
         renderBreadcrumbs();
         renderEntries();
@@ -299,9 +305,7 @@
       loadDirectory(browserPath.value, false);
     });
     search.addEventListener('input', renderEntries);
-    rootSelect.addEventListener('change', () => loadDirectory(rootSelect.value));
     document.getElementById('browser-up').addEventListener('click', () => { if (parentPath) loadDirectory(parentPath); });
-    document.getElementById('browser-root-button').addEventListener('click', () => { if (activeRoot) loadDirectory(activeRoot.path); });
     document.getElementById('browser-choose').addEventListener('click', () => {
       if (targetInput) targetInput.value = currentPath;
       closeBrowser();
