@@ -1,6 +1,6 @@
 # Cratekeep
 
-![Cratekeep logo](cratekeep-logo.png)
+![Cratekeep logo](beets_mvp/static/cratekeep-logo.png)
 
 Cratekeep is a lightweight web interface for managing a [beets](https://beets.io/) music library. It lists music waiting in an inbox, provides a review-and-execute import flow, edits common metadata and file tags, and can request a Navidrome rescan.
 
@@ -19,7 +19,7 @@ APP_UID="$(id -u)" APP_GID="$(id -g)" docker compose up -d
 
 Open <http://localhost:8788>. Put albums or individual audio files in `data/inbox`. Imported files are moved to `data/library`; application and beets databases are stored in `data/config`.
 
-On first launch, Cratekeep opens a setup screen. Use **Browse** to choose the mounted inbox and library directories, then optionally enter Navidrome rescan details. The choices are stored in `data/config/app.db` and remain editable from the Settings link. The browser only exposes directories under the container paths you mount; it cannot see arbitrary Unraid host paths.
+On first launch, Cratekeep opens a setup screen. Type paths directly or use **Browse** to navigate the container and choose the mounted inbox and library directories, then optionally enter Navidrome rescan details. The choices are stored in `data/config/app.db` and remain editable from the Settings link. Browser paths are container paths; host paths are never exposed to the app.
 
 When upgrading an existing Compose installation, stop the container and move the contents of `data/state` to `data/config` before starting the new image. The database filenames and formats are unchanged.
 
@@ -40,7 +40,7 @@ Create an **Add Container** entry with these settings:
 
 The container runs as UID 10001 by default. Ensure the mapped directories are writable by that UID, or use Unraid's container advanced settings to set an appropriate numeric user such as `99:100`.
 
-For an Unraid deployment, mount each host directory at a clear container path and choose those container paths in the setup browser. For example, `/mnt/user/media-download-cache/cratekeep` can map to `/data/inbox`, and `/mnt/user/media-fast/music` can map to `/data/library`. The host paths never need to be entered in Cratekeep.
+For an Unraid deployment, mount each host directory at any clear container path and choose those container paths in the setup browser. For example, `/mnt/user/media-download-cache/cratekeep` can map to `/userMedia/inbox`, and `/mnt/user/media-fast/music` can map to `/userMedia/library`. The host paths never need to be entered in Cratekeep.
 
 ## Local development
 
@@ -84,7 +84,7 @@ curl -sS -X POST http://localhost:8788/api/imports/1/execute
 Execution verifies that the previewed files have not changed, then runs `beet import --quiet --noautotag --move`.
 
 - `GET /healthz` — liveness check
-- `GET /api/browse?path=/data` — list directories beneath a mounted container root
+- `GET /api/browse?path=/userMedia` — list directories beneath the container's browse root
 - `GET /api/inbox` — list immediate import candidates
 - `GET /api/items` — list beets library metadata
 - `POST /api/imports/preview` — snapshot an inbox selection for review

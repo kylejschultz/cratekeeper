@@ -66,16 +66,22 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/api/browse")
     def browse():
         requested = request.args.get("path", "")
+        roots = _browse_roots(app)
         try:
-            directory = _safe_browse_path(app, requested)
+            directory = _safe_browse_path(app, requested, roots)
         except ValueError as exc:
             abort(400, str(exc))
         entries = []
         for entry in sorted(directory.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())):
             if entry.is_dir() and not entry.is_symlink():
                 entries.append({"name": entry.name, "path": str(entry)})
-        parent = _browse_parent(app, directory)
-        return jsonify(path=str(directory), parent=parent, entries=entries)
+        parent = _browse_parent(directory, roots)
+        return jsonify(
+            path=str(directory),
+            parent=parent,
+            entries=entries,
+            roots=[{"name": root.name or str(root), "path": str(root)} for root in roots],
+        )
 
     @app.get("/api/inbox")
     def inbox():
@@ -330,7 +336,10 @@ def _default_paths() -> dict[str, str]:
 
 def _browse_roots(app: Flask) -> list[Path]:
     configured = app.config.get("BROWSE_ROOTS")
-    candidates = configured or ("/data", "/userMedia", "/media", "/mnt", str(Path.cwd() / "data"))
+    # A container mount destination is user-defined, so the default browser
+    # must be able to reach arbitrary mount names such as /userMedia.
+    # Tests and hardened deployments can still provide explicit roots.
+    candidates = configured or ("/",)
     roots = []
     for candidate in candidates:
         path = Path(candidate).expanduser().resolve()
@@ -339,20 +348,19 @@ def _browse_roots(app: Flask) -> list[Path]:
     return roots
 
 
-def _safe_browse_path(app: Flask, requested: str) -> Path:
+def _safe_browse_path(app: Flask, requested: str, roots: list[Path] | None = None) -> Path:
+    roots = roots if roots is not None else _browse_roots(app)
     if not requested:
-        roots = _browse_roots(app)
         if not roots:
             raise ValueError("no browseable mounted directories are available")
         return roots[0]
     path = Path(requested).expanduser().resolve()
-    if not path.is_dir() or not any(path == root or root in path.parents for root in _browse_roots(app)):
+    if not path.is_dir() or not any(path == root or root in path.parents for root in roots):
         raise ValueError("path is not inside a browseable mounted directory")
     return path
 
 
-def _browse_parent(app: Flask, directory: Path) -> str | None:
-    roots = _browse_roots(app)
+def _browse_parent(directory: Path, roots: list[Path]) -> str | None:
     if directory in roots:
         return None
     parent = directory.parent

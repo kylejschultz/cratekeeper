@@ -114,6 +114,49 @@ def test_browse_is_limited_to_configured_mount_roots(tmp_path):
     assert client.get(f"/api/browse?path={outside}").status_code == 400
 
 
+def test_browse_exposes_and_navigates_each_mounted_root(tmp_path):
+    first = tmp_path / "first-mount"
+    second = tmp_path / "userMedia"
+    (first / "inbox").mkdir(parents=True)
+    (second / "music" / "albums").mkdir(parents=True)
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "test",
+        "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(first), str(second)],
+    })
+    client = app.test_client()
+
+    root = client.get("/api/browse")
+    assert root.json["roots"] == [
+        {"name": "first-mount", "path": str(first)},
+        {"name": "userMedia", "path": str(second)},
+    ]
+    other_root = client.get("/api/browse", query_string={"path": str(second)})
+    assert other_root.status_code == 200
+    assert other_root.json["path"] == str(second)
+    assert other_root.json["parent"] is None
+    assert other_root.json["entries"] == [{"name": "music", "path": str(second / "music")}]
+
+
+def test_setup_uses_static_logo_and_typeable_paths(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "test",
+        "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(tmp_path)],
+    })
+    client = app.test_client()
+
+    page = client.get("/setup")
+    assert b'src="/static/cratekeep-logo.png"' in page.data
+    assert b'id="inbox_path"' in page.data
+    assert b'readonly' not in page.data
+    logo = client.get("/static/cratekeep-logo.png")
+    assert logo.status_code == 200
+    assert logo.mimetype == "image/png"
+
+
 def test_settings_update_paths_and_preserve_or_clear_token(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()

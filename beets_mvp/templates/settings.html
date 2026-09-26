@@ -5,27 +5,73 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ 'Set up' if first_run else 'Settings' }} · Cratekeep</title>
   <style>
-    body { font: 16px system-ui; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    :root {
+      color-scheme: light dark;
+      --page: #eef3f7;
+      --surface: #fff;
+      --text: #243442;
+      --muted: #5b6c79;
+      --border: #a9bac7;
+      --accent: #315f7d;
+      --accent-hover: #244b65;
+      --focus: #1876b2;
+      --success: #dcefe5;
+      --error: #f7dddd;
+    }
+    * { box-sizing: border-box; }
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1.5rem; color: var(--text); background: var(--page); }
+    main { padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); box-shadow: 0 .35rem 1.5rem rgb(32 56 72 / 10%); }
+    .logo { display: block; width: min(100%, 300px); height: auto; margin: 0 auto 1.5rem; }
+    h1 { margin-top: 0; color: var(--accent); }
     label { display: block; font-weight: 600; margin-top: 1.25rem; }
-    input[type=text], input[type=password], input[type=url] { box-sizing: border-box; width: 100%; margin-top: .35rem; padding: .65rem; }
+    input[type=text], input[type=password], input[type=url], select { width: 100%; margin-top: .35rem; padding: .65rem; color: var(--text); border: 1px solid var(--border); border-radius: .3rem; background: var(--surface); }
     .path-picker { display: flex; gap: .5rem; margin-top: .35rem; }
     .path-picker input { flex: 1; margin-top: 0; }
-    .browser { border: 1px solid #bbb; padding: .75rem; margin-top: .5rem; }
-    .browser select { width: 100%; padding: .5rem; }
-    small { display: block; margin-top: .3rem; color: #555; }
-    button { margin-top: 1.5rem; padding: .65rem 1rem; }
-    .flash { background: #def7e5; padding: .75rem; }
-    .error { background: #fee2e2; }
+    .browser { border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; margin-top: 1rem; background: var(--page); }
+    .browser label { margin-top: .75rem; }
+    .browser-path { overflow-wrap: anywhere; color: var(--muted); }
+    .browser-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+    small { display: block; margin-top: .3rem; color: var(--muted); }
+    button { margin-top: 1.5rem; padding: .65rem 1rem; color: #fff; border: 1px solid var(--accent); border-radius: .3rem; background: var(--accent); cursor: pointer; }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    .path-picker button, .browser-actions button { margin-top: 0; }
+    a { color: var(--accent); }
+    :is(a, button, input, select):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .flash { padding: .75rem; border-radius: .3rem; background: var(--success); }
+    .error { background: var(--error); }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #17232c;
+        --surface: #202f3a;
+        --text: #e4edf3;
+        --muted: #b7c5cf;
+        --border: #526b7d;
+        --accent: #8ab8d4;
+        --accent-hover: #376d8e;
+        --focus: #70c7fa;
+        --success: #244b3a;
+        --error: #572f35;
+      }
+      button { color: #10202a; }
+      button:hover { color: #fff; }
+    }
+    @media (max-width: 520px) {
+      body { margin: 0; padding: .75rem; }
+      .path-picker { align-items: stretch; flex-direction: column; }
+    }
   </style>
 </head>
 <body>
+<main>
+  <img class="logo" src="{{ url_for('static', filename='cratekeep-logo.png') }}" alt="Cratekeep">
   <h1>{{ 'Set up Cratekeep' if first_run else 'Cratekeep settings' }}</h1>
   {% if first_run %}<p>Choose the folders Cratekeep will use. These settings are stored in the application database and can be changed later.</p>{% endif %}
   {% for category, message in get_flashed_messages(with_categories=true) %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
   <form method="post">
     <label>Inbox path
       <div class="path-picker">
-        <input id="inbox_path" name="inbox_path" type="text" readonly required value="{{ settings.get('inbox_path', default_inbox) }}">
+        <input id="inbox_path" name="inbox_path" type="text" required value="{{ settings.get('inbox_path', default_inbox) }}">
         <button type="button" data-open-picker="inbox_path">Browse</button>
       </div>
     </label>
@@ -33,7 +79,7 @@
 
     <label>Library path
       <div class="path-picker">
-        <input id="library_path" name="library_path" type="text" readonly required value="{{ settings.get('library_path', default_library) }}">
+        <input id="library_path" name="library_path" type="text" required value="{{ settings.get('library_path', default_library) }}">
         <button type="button" data-open-picker="library_path">Browse</button>
       </div>
     </label>
@@ -57,28 +103,40 @@
     <button type="submit">{{ 'Finish setup' if first_run else 'Save settings' }}</button>
     {% if not first_run %}<a href="{{ url_for('index') }}">Cancel</a>{% endif %}
   </form>
-  <div id="browser" class="browser" hidden>
-    <strong>Select a mounted directory</strong>
-    <p id="browser-path"></p>
+  <div id="browser" class="browser" role="dialog" aria-labelledby="browser-title" hidden>
+    <strong id="browser-title">Select a mounted directory</strong>
+    <label for="browser-root">Mounted root</label>
+    <select id="browser-root"></select>
+    <p id="browser-path" class="browser-path" aria-live="polite"></p>
+    <label for="browser-entries">Directories</label>
     <select id="browser-entries" size="8"></select>
-    <p>
+    <p class="browser-actions">
       <button type="button" id="browser-up">Up</button>
       <button type="button" id="browser-open">Open</button>
       <button type="button" id="browser-choose">Choose this folder</button>
       <button type="button" id="browser-close">Cancel</button>
     </p>
   </div>
+</main>
   <script>
     const browser = document.getElementById('browser');
     const browserPath = document.getElementById('browser-path');
+    const rootSelect = document.getElementById('browser-root');
     const entries = document.getElementById('browser-entries');
     let targetInput, currentPath, parentPath;
     async function loadDirectory(path = '') {
       const response = await fetch('/api/browse?path=' + encodeURIComponent(path));
-      if (!response.ok) { alert('That directory is not available inside the container.'); return; }
+      if (!response.ok) {
+        if (path) { loadDirectory(); return; }
+        alert('No mounted directories are available inside the container.');
+        return;
+      }
       const data = await response.json();
       currentPath = data.path; parentPath = data.parent;
       browserPath.textContent = currentPath;
+      rootSelect.replaceChildren(...data.roots.map(root => new Option(root.path, root.path)));
+      const activeRoot = data.roots.find(root => currentPath === root.path || currentPath.startsWith(root.path + '/'));
+      if (activeRoot) rootSelect.value = activeRoot.path;
       entries.replaceChildren(...data.entries.map(item => new Option(item.name, item.path)));
       document.getElementById('browser-up').disabled = !parentPath;
     }
@@ -90,6 +148,8 @@
     document.getElementById('browser-open').addEventListener('click', () => {
       if (entries.value) loadDirectory(entries.value);
     });
+    entries.addEventListener('dblclick', () => { if (entries.value) loadDirectory(entries.value); });
+    rootSelect.addEventListener('change', () => loadDirectory(rootSelect.value));
     document.getElementById('browser-up').addEventListener('click', () => { if (parentPath) loadDirectory(parentPath); });
     document.getElementById('browser-choose').addEventListener('click', () => {
       if (targetInput) targetInput.value = currentPath;
