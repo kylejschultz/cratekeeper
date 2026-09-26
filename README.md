@@ -34,7 +34,7 @@ Create an **Add Container** entry with these settings:
   - `/data/inbox` → an inbox share
   - `/data/library` → your music library share
   - `/data/config` → `/mnt/user/appdata/cratekeeper`
-- **Variables:** set `SECRET_KEY` to a long random value
+- **Variables:** none required; Cratekeeper generates its signing key on first boot
 
 The container runs as UID 10001 by default. Ensure the mapped directories are writable by that UID, or use Unraid's container advanced settings to set an appropriate numeric user such as `99:100`.
 
@@ -65,7 +65,7 @@ gunicorn --bind 127.0.0.1:8788 --workers 1 --threads 4 'beets_mvp:create_app()'
 | Variable | Default | Purpose |
 |---|---|---|
 | `STATE_PATH` | `./data/config` | SQLite databases and generated beets config. |
-| `SECRET_KEY` | development-only value | Flask signing key. Set a random value for normal use. |
+| `SECRET_KEY` | generated in `$STATE_PATH/secret.key` | Optional override for advanced deployments. The generated key is retained across restarts when `$STATE_PATH` is mounted persistently. |
 
 Inbox, library, and optional Navidrome settings are configured in the first-run setup screen and persisted in the application SQLite database. Cratekeeper manages the beets config at `$STATE_PATH/config.yaml` from those settings.
 
@@ -105,3 +105,4 @@ python -m compileall -q beets_mvp tests
 - A metadata database update occurs before its file-tag write, so a failed tag write can leave them temporarily inconsistent. Keep backups and ensure library files are writable.
 - Navidrome integration is a generic POST with optional bearer authentication and is not automatically run after imports.
 - Updating the library path in Settings also updates the generated beets config.
+- The Flask signing key is generated on first boot and stored as `$STATE_PATH/secret.key`; keep the config volume persistent. It is not displayed in the UI because Cratekeeper does not yet have authentication.

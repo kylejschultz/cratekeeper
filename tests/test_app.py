@@ -42,6 +42,25 @@ def test_default_state_path_uses_config_directory(tmp_path, monkeypatch):
     assert app.config["BEETS_CONFIG"] == str(tmp_path / "data" / "config" / "config.yaml")
 
 
+def test_secret_key_is_generated_and_persisted(tmp_path, monkeypatch):
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    state_path = tmp_path / "config"
+    app = create_app({"TESTING": True, "STATE_PATH": str(state_path)})
+    key = app.config["SECRET_KEY"]
+
+    assert len(key) >= 64
+    assert (state_path / "secret.key").read_text().strip() == key
+
+    restarted = create_app({"TESTING": True, "STATE_PATH": str(state_path)})
+    assert restarted.config["SECRET_KEY"] == key
+
+
+def test_explicit_secret_key_overrides_generated_key(tmp_path):
+    app = create_app({"TESTING": True, "STATE_PATH": str(tmp_path / "config"), "SECRET_KEY": "explicit"})
+
+    assert app.config["SECRET_KEY"] == "explicit"
+
+
 def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
     monkeypatch.setenv("INBOX_PATH", "/ignored/inbox")
     monkeypatch.setenv("LIBRARY_PATH", "/ignored/library")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sqlite3
 import subprocess
 import urllib.error
@@ -22,14 +23,16 @@ SETTING_KEYS = ("inbox_path", "library_path", "navidrome_rescan_url", "navidrome
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY", "local-development-only"),
+        SECRET_KEY=os.getenv("SECRET_KEY", ""),
         STATE_PATH=os.getenv("STATE_PATH", str(Path.cwd() / "data/config")),
     )
     if test_config:
         app.config.update(test_config)
 
-    Path(app.config["STATE_PATH"]).mkdir(parents=True, exist_ok=True)
     state_path = Path(app.config["STATE_PATH"])
+    state_path.mkdir(parents=True, exist_ok=True)
+    if not app.config["SECRET_KEY"]:
+        app.config["SECRET_KEY"] = _load_or_create_secret_key(state_path / "secret.key")
     app.config["BEETS_DB"] = str(state_path / "library.db")
     app.config["APP_DB"] = str(state_path / "app.db")
     app.config["BEETS_CONFIG"] = str(state_path / "config.yaml")
@@ -169,6 +172,26 @@ def create_app(test_config: dict | None = None) -> Flask:
             return jsonify(status="failed", error=str(exc)), 502
 
     return app
+
+
+def _load_or_create_secret_key(path: Path) -> str:
+    try:
+        key = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        key = ""
+    if key:
+        return key
+    key = secrets.token_urlsafe(48)
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            stream.write(key + "\n")
+    except FileExistsError:
+        return path.read_text(encoding="utf-8").strip()
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+    return key
 
 
 def _write_beets_config(app: Flask) -> None:
