@@ -60,7 +60,10 @@ def test_index_renders_inbox_data_and_library_edit_form(tmp_path, monkeypatch):
         "year": 2026,
         "track": 1,
         "disc": 1,
+        "path": str(tmp_path / "Example track.mp3"),
+        "bytes": 2 * 1024**2,
     }
+    Path(item["path"]).write_bytes(b"x" * (2 * 1024**2))
     monkeypatch.setattr("beets_mvp._items", lambda current_app: [item])
 
     page = app.test_client().get("/")

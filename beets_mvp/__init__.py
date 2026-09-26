@@ -386,6 +386,7 @@ def _serialize_item(item) -> dict:
     result = {key: item.get(key) for key in ("id", "title", "artist", "album", "albumartist", "genre", "year", "track", "disc")}
     path = item.get("path")
     result["path"] = os.fsdecode(path) if path else ""
+    result["bytes"] = Path(result["path"]).stat().st_size if result["path"] and Path(result["path"]).is_file() else None
     return result
 
 
