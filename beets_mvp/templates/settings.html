@@ -17,29 +17,58 @@
       --focus: #1876b2;
       --success: #dcefe5;
       --error: #f7dddd;
+      --overlay: rgb(12 27 38 / 68%);
     }
     * { box-sizing: border-box; }
     body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 1.5rem; color: var(--text); background: var(--page); }
     main { padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); box-shadow: 0 .35rem 1.5rem rgb(32 56 72 / 10%); }
-    .logo { display: block; width: min(100%, 300px); height: auto; margin: 0 auto 1.5rem; }
+    .logo { display: block; width: 112px; height: auto; margin: 0 auto 1rem; }
     h1 { margin-top: 0; color: var(--accent); }
     label { display: block; font-weight: 600; margin-top: 1.25rem; }
     input[type=text], input[type=password], input[type=url], select { width: 100%; margin-top: .35rem; padding: .65rem; color: var(--text); border: 1px solid var(--border); border-radius: .3rem; background: var(--surface); }
     .path-picker { display: flex; gap: .5rem; margin-top: .35rem; }
     .path-picker input { flex: 1; margin-top: 0; }
-    .browser { border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; margin-top: 1rem; background: var(--page); }
-    .browser label { margin-top: .75rem; }
-    .browser-path { overflow-wrap: anywhere; color: var(--muted); }
-    .browser-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
     small { display: block; margin-top: .3rem; color: var(--muted); }
     button { margin-top: 1.5rem; padding: .65rem 1rem; color: #fff; border: 1px solid var(--accent); border-radius: .3rem; background: var(--accent); cursor: pointer; }
     button:hover { background: var(--accent-hover); }
     button:disabled { cursor: not-allowed; opacity: .55; }
-    .path-picker button, .browser-actions button { margin-top: 0; }
+    .path-picker button, .browser button { margin-top: 0; }
     a { color: var(--accent); }
     :is(a, button, input, select):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     .flash { padding: .75rem; border-radius: .3rem; background: var(--success); }
     .error { background: var(--error); }
+    .browser[hidden] { display: none; }
+    .browser { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 1rem; background: var(--overlay); }
+    .browser-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: min(720px, calc(100vh - 2rem)); overflow: hidden; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); box-shadow: 0 1.25rem 4rem rgb(5 20 30 / 35%); }
+    .browser-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--accent); color: #fff; }
+    .browser-header h2 { margin: 0; font-size: 1.15rem; }
+    .browser-close { min-width: 2.25rem; padding: .25rem .55rem; border-color: transparent; background: transparent; color: inherit; font-size: 1.4rem; line-height: 1; }
+    .browser-close:hover { background: rgb(255 255 255 / 16%); }
+    .browser-body { min-height: 0; overflow: auto; padding: 1rem 1.25rem; }
+    .browser-toolbar { display: grid; grid-template-columns: auto minmax(9rem, 1fr) auto; gap: .5rem; }
+    .browser-toolbar button, .browser-toolbar select { margin: 0; }
+    .browser-toolbar select { min-width: 0; }
+    .browser-path-form { display: flex; gap: .5rem; margin-top: .75rem; }
+    .browser-path-form input { flex: 1; min-width: 0; margin: 0; }
+    .browser-path-form button { margin: 0; }
+    .breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: .15rem; min-height: 2.25rem; margin: .55rem 0; }
+    .breadcrumb { margin: 0; padding: .2rem .35rem; border-color: transparent; background: transparent; color: var(--accent); }
+    .breadcrumb:hover { background: var(--page); color: var(--accent-hover); }
+    .breadcrumb-separator { color: var(--muted); }
+    .browser-search { margin: 0 0 .65rem; }
+    .directory-list { min-height: 15rem; overflow-y: auto; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); }
+    .directory-row { display: grid; grid-template-columns: 1.75rem 1fr auto; align-items: center; width: 100%; margin: 0; padding: .7rem .85rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); text-align: left; }
+    .directory-row:last-child { border-bottom: 0; }
+    .directory-row:hover, .directory-row:focus-visible { background: var(--page); color: var(--text); }
+    .directory-row[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+    .folder-icon { color: var(--accent); font-size: 1.1rem; }
+    .directory-open { color: var(--muted); font-size: .85rem; }
+    .browser-status { min-height: 1.5rem; margin: .5rem 0 0; color: var(--muted); }
+    .browser-status.error-text { color: #a52b35; }
+    .browser-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin: 0; padding: .85rem 1.25rem; border-top: 1px solid var(--border); background: var(--page); }
+    .browser-actions .secondary { border-color: var(--border); background: var(--surface); color: var(--text); }
+    .browser-actions .secondary:hover { background: var(--page); }
+    body.modal-open { overflow: hidden; }
     @media (prefers-color-scheme: dark) {
       :root {
         --page: #17232c;
@@ -55,10 +84,19 @@
       }
       button { color: #10202a; }
       button:hover { color: #fff; }
+      .browser-header { color: #10202a; }
+      .browser-close:hover { color: #10202a; }
+      .browser-status.error-text { color: #ffadb5; }
     }
     @media (max-width: 520px) {
       body { margin: 0; padding: .75rem; }
       .path-picker { align-items: stretch; flex-direction: column; }
+      .browser { padding: .4rem; }
+      .browser-dialog { max-height: calc(100vh - .8rem); }
+      .browser-toolbar { grid-template-columns: auto 1fr; }
+      .browser-toolbar select { grid-column: 1 / -1; grid-row: 2; }
+      .browser-path-form { align-items: stretch; flex-direction: column; }
+      .directory-list { min-height: 11rem; }
     }
   </style>
 </head>
@@ -103,59 +141,188 @@
     <button type="submit">{{ 'Finish setup' if first_run else 'Save settings' }}</button>
     {% if not first_run %}<a href="{{ url_for('index') }}">Cancel</a>{% endif %}
   </form>
-  <div id="browser" class="browser" role="dialog" aria-labelledby="browser-title" hidden>
-    <strong id="browser-title">Select a mounted directory</strong>
-    <label for="browser-root">Mounted root</label>
-    <select id="browser-root"></select>
-    <p id="browser-path" class="browser-path" aria-live="polite"></p>
-    <label for="browser-entries">Directories</label>
-    <select id="browser-entries" size="8"></select>
-    <p class="browser-actions">
-      <button type="button" id="browser-up">Up</button>
-      <button type="button" id="browser-open">Open</button>
-      <button type="button" id="browser-choose">Choose this folder</button>
-      <button type="button" id="browser-close">Cancel</button>
-    </p>
+  <div id="browser" class="browser" hidden>
+    <section class="browser-dialog" role="dialog" aria-modal="true" aria-labelledby="browser-title" tabindex="-1">
+      <header class="browser-header">
+        <h2 id="browser-title">Select a mounted directory</h2>
+        <button type="button" class="browser-close" id="browser-close-icon" aria-label="Close directory browser">&times;</button>
+      </header>
+      <div class="browser-body">
+        <div class="browser-toolbar">
+          <button type="button" id="browser-up" aria-label="Go to parent directory">&#8593; Up</button>
+          <select id="browser-root" aria-label="Mounted root"></select>
+          <button type="button" id="browser-root-button">Root</button>
+        </div>
+        <form id="browser-path-form" class="browser-path-form">
+          <input id="browser-path" type="text" aria-label="Current directory path" autocomplete="off" spellcheck="false">
+          <button type="submit">Go</button>
+        </form>
+        <nav id="browser-breadcrumbs" class="breadcrumbs" aria-label="Current directory breadcrumbs"></nav>
+        <input id="browser-search" class="browser-search" type="search" placeholder="Filter directories" aria-label="Filter directories" autocomplete="off">
+        <div id="browser-entries" class="directory-list" role="listbox" aria-label="Directories" tabindex="-1"></div>
+        <p id="browser-status" class="browser-status" aria-live="polite"></p>
+      </div>
+      <footer class="browser-actions">
+        <button type="button" class="secondary" id="browser-close">Cancel</button>
+        <button type="button" id="browser-choose">Choose this folder</button>
+      </footer>
+    </section>
   </div>
 </main>
   <script>
     const browser = document.getElementById('browser');
+    const dialog = browser.querySelector('.browser-dialog');
     const browserPath = document.getElementById('browser-path');
+    const breadcrumbs = document.getElementById('browser-breadcrumbs');
     const rootSelect = document.getElementById('browser-root');
     const entries = document.getElementById('browser-entries');
-    let targetInput, currentPath, parentPath;
-    async function loadDirectory(path = '') {
-      const response = await fetch('/api/browse?path=' + encodeURIComponent(path));
-      if (!response.ok) {
-        if (path) { loadDirectory(); return; }
-        alert('No mounted directories are available inside the container.');
-        return;
-      }
-      const data = await response.json();
-      currentPath = data.path; parentPath = data.parent;
-      browserPath.textContent = currentPath;
-      rootSelect.replaceChildren(...data.roots.map(root => new Option(root.path, root.path)));
-      const activeRoot = data.roots.find(root => currentPath === root.path || currentPath.startsWith(root.path + '/'));
-      if (activeRoot) rootSelect.value = activeRoot.path;
-      entries.replaceChildren(...data.entries.map(item => new Option(item.name, item.path)));
-      document.getElementById('browser-up').disabled = !parentPath;
+    const search = document.getElementById('browser-search');
+    const status = document.getElementById('browser-status');
+    let targetInput, currentPath = '', parentPath = null, activeRoot = null, directoryEntries = [], selectedPath = null, returnFocus = null;
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle('error-text', isError);
     }
-    document.querySelectorAll('[data-open-picker]').forEach(button => button.addEventListener('click', () => {
+
+    function renderBreadcrumbs() {
+      breadcrumbs.replaceChildren();
+      if (!activeRoot) return;
+      const relative = currentPath.slice(activeRoot.path.length).split('/').filter(Boolean);
+      const parts = [{ name: activeRoot.name || activeRoot.path, path: activeRoot.path }];
+      relative.forEach((name, index) => parts.push({
+        name,
+        path: activeRoot.path.replace(/\/$/, '') + '/' + relative.slice(0, index + 1).join('/'),
+      }));
+      parts.forEach((part, index) => {
+        if (index) {
+          const separator = document.createElement('span');
+          separator.className = 'breadcrumb-separator';
+          separator.setAttribute('aria-hidden', 'true');
+          separator.textContent = '/';
+          breadcrumbs.append(separator);
+        }
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'breadcrumb';
+        button.textContent = part.name;
+        button.setAttribute('aria-label', 'Open ' + part.path);
+        button.addEventListener('click', () => loadDirectory(part.path));
+        breadcrumbs.append(button);
+      });
+    }
+
+    function renderEntries() {
+      const query = search.value.trim().toLocaleLowerCase();
+      const visible = directoryEntries.filter(item => item.name.toLocaleLowerCase().includes(query));
+      entries.replaceChildren();
+      visible.forEach(item => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'directory-row';
+        row.dataset.path = item.path;
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', String(selectedPath === item.path));
+        const icon = document.createElement('span');
+        icon.className = 'folder-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '\uD83D\uDCC1';
+        const name = document.createElement('span');
+        name.textContent = item.name;
+        const hint = document.createElement('span');
+        hint.className = 'directory-open';
+        hint.textContent = 'Open';
+        row.append(icon, name, hint);
+        row.addEventListener('click', () => {
+          selectedPath = item.path;
+          entries.querySelectorAll('.directory-row').forEach(candidate => candidate.setAttribute('aria-selected', String(candidate === row)));
+        });
+        row.addEventListener('dblclick', () => loadDirectory(item.path));
+        row.addEventListener('keydown', event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            loadDirectory(item.path);
+          }
+        });
+        entries.append(row);
+      });
+      setStatus(visible.length ? `${visible.length} ${visible.length === 1 ? 'directory' : 'directories'}` : 'No matching directories.');
+    }
+
+    async function loadDirectory(path = '', allowFallback = true) {
+      setStatus('Loading directories…');
+      try {
+        const response = await fetch('/api/browse?path=' + encodeURIComponent(path));
+        if (!response.ok) {
+          if (path && allowFallback) return loadDirectory('', false);
+          throw new Error('No mounted directories are available inside the container.');
+        }
+        const data = await response.json();
+        currentPath = data.path;
+        parentPath = data.parent;
+        directoryEntries = data.entries;
+        selectedPath = null;
+        browserPath.value = currentPath;
+        rootSelect.replaceChildren(...data.roots.map(root => new Option(root.name || root.path, root.path)));
+        activeRoot = data.roots.find(root => currentPath === root.path || currentPath.startsWith(root.path.replace(/\/$/, '') + '/')) || data.roots[0];
+        if (activeRoot) rootSelect.value = activeRoot.path;
+        document.getElementById('browser-up').disabled = !parentPath;
+        document.getElementById('browser-root-button').disabled = !activeRoot || currentPath === activeRoot.path;
+        search.value = '';
+        renderBreadcrumbs();
+        renderEntries();
+      } catch (error) {
+        directoryEntries = [];
+        entries.replaceChildren();
+        setStatus(error.message || 'Unable to load directories.', true);
+      }
+    }
+
+    function closeBrowser() {
+      browser.hidden = true;
+      document.body.classList.remove('modal-open');
+      if (returnFocus) returnFocus.focus();
+    }
+
+    function openBrowser(button) {
       targetInput = document.getElementById(button.dataset.openPicker);
+      returnFocus = button;
       browser.hidden = false;
+      document.body.classList.add('modal-open');
+      dialog.focus();
       loadDirectory(targetInput.value || '');
-    }));
-    document.getElementById('browser-open').addEventListener('click', () => {
-      if (entries.value) loadDirectory(entries.value);
+    }
+
+    document.querySelectorAll('[data-open-picker]').forEach(button => button.addEventListener('click', () => openBrowser(button)));
+    document.getElementById('browser-path-form').addEventListener('submit', event => {
+      event.preventDefault();
+      loadDirectory(browserPath.value, false);
     });
-    entries.addEventListener('dblclick', () => { if (entries.value) loadDirectory(entries.value); });
+    search.addEventListener('input', renderEntries);
     rootSelect.addEventListener('change', () => loadDirectory(rootSelect.value));
     document.getElementById('browser-up').addEventListener('click', () => { if (parentPath) loadDirectory(parentPath); });
+    document.getElementById('browser-root-button').addEventListener('click', () => { if (activeRoot) loadDirectory(activeRoot.path); });
     document.getElementById('browser-choose').addEventListener('click', () => {
       if (targetInput) targetInput.value = currentPath;
-      browser.hidden = true;
+      closeBrowser();
     });
-    document.getElementById('browser-close').addEventListener('click', () => { browser.hidden = true; });
+    document.getElementById('browser-close').addEventListener('click', closeBrowser);
+    document.getElementById('browser-close-icon').addEventListener('click', closeBrowser);
+    browser.addEventListener('mousedown', event => { if (event.target === browser) closeBrowser(); });
+    browser.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeBrowser();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
   </script>
 </body>
 </html>

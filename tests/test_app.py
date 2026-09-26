@@ -139,7 +139,7 @@ def test_browse_exposes_and_navigates_each_mounted_root(tmp_path):
     assert other_root.json["entries"] == [{"name": "music", "path": str(second / "music")}]
 
 
-def test_setup_uses_static_logo_and_typeable_paths(tmp_path):
+def test_setup_uses_compact_logo_typeable_paths_and_modal_browser(tmp_path):
     app = create_app({
         "TESTING": True,
         "SECRET_KEY": "test",
@@ -150,8 +150,15 @@ def test_setup_uses_static_logo_and_typeable_paths(tmp_path):
 
     page = client.get("/setup")
     assert b'src="/static/cratekeep-logo.png"' in page.data
+    assert b'.logo { display: block; width: 112px;' in page.data
     assert b'id="inbox_path"' in page.data
     assert b'readonly' not in page.data
+    assert b'role="dialog" aria-modal="true"' in page.data
+    assert b'id="browser-breadcrumbs"' in page.data
+    assert b'id="browser-search"' in page.data
+    assert b'id="browser-path-form"' in page.data
+    assert b"event.key === 'Escape'" in page.data
+    assert b"fetch('/api/browse?path='" in page.data
     logo = client.get("/static/cratekeep-logo.png")
     assert logo.status_code == 200
     assert logo.mimetype == "image/png"
