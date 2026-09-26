@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from beets_mvp import create_app
+from beets_mvp import _format_bytes, create_app
 
 def make_app(tmp_path: Path):
     app = create_app({
@@ -48,7 +48,7 @@ def test_index_renders_inbox_data_and_library_edit_form(tmp_path, monkeypatch):
     app = make_app(tmp_path)
     monkeypatch.setattr(
         "beets_mvp._inbox_candidates",
-        lambda current_app: [{"path": "new-album", "files": 2, "bytes": 4096}],
+        lambda current_app: [{"path": "new-album", "files": 2, "bytes": 1536 * 1024**2}],
     )
     item = {
         "id": 7,
@@ -67,10 +67,18 @@ def test_index_renders_inbox_data_and_library_edit_form(tmp_path, monkeypatch):
 
     assert b"new-album" in page.data
     assert b"2 audio files waiting" in page.data
+    assert b'<th class="numeric" scope="col">Size</th>' in page.data
+    assert page.data.count(b"1.5 GB") == 2
     assert b"Example track" in page.data
     assert b'action="/api/items/7"' in page.data
     assert b'name="title" value="Example track"' in page.data
     assert b"Save changes" in page.data
+
+def test_format_bytes_handles_megabytes_zero_and_unknown():
+    assert _format_bytes(5 * 1024**2) == "5.0 MB"
+    assert _format_bytes(4096) == "<0.1 MB"
+    assert _format_bytes(0) == "0 MB"
+    assert _format_bytes(None) == "—"
 
 def test_default_state_path_uses_config_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)

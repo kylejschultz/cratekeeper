@@ -22,6 +22,7 @@ SETTING_KEYS = ("inbox_path", "library_path", "navidrome_rescan_url", "navidrome
 
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
+    app.add_template_filter(_format_bytes, "format_bytes")
     app.config.from_mapping(
         SECRET_KEY=os.getenv("SECRET_KEY", ""),
         STATE_PATH=os.getenv("STATE_PATH", str(Path.cwd() / "data/config")),
@@ -398,6 +399,17 @@ def _inbox_candidates(app: Flask) -> list[dict]:
         if files:
             candidates.append({"path": entry.name, "files": len(files), "bytes": sum(p.stat().st_size for p in files)})
     return candidates
+
+
+def _format_bytes(value: int | None) -> str:
+    if value is None:
+        return "—"
+    if value == 0:
+        return "0 MB"
+    if value >= 1024**3:
+        return f"{value / 1024**3:.1f} GB"
+    size_mb = value / 1024**2
+    return f"{size_mb:.1f} MB" if size_mb >= 0.1 else "<0.1 MB"
 
 
 def _audio_files(path: Path) -> list[Path]:

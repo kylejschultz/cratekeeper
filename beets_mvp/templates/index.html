@@ -149,7 +149,7 @@
         <div class="summary-grid" aria-label="Library summary">
           <article class="summary-card"><p class="summary-label">Inbox selections</p><p class="summary-value">{{ candidates|length }}</p><p class="summary-note">{{ candidates|sum(attribute='files') }} audio files waiting</p></article>
           <article class="summary-card"><p class="summary-label">Library tracks</p><p class="summary-value">{{ items|length }}</p><p class="summary-note">Tracks available for metadata editing</p></article>
-          <article class="summary-card"><p class="summary-label">Inbox size</p><p class="summary-value">{{ candidates|sum(attribute='bytes') }}</p><p class="summary-note">Total bytes across inbox selections</p></article>
+          <article class="summary-card"><p class="summary-label">Inbox size</p><p class="summary-value">{{ candidates|sum(attribute='bytes')|format_bytes }}</p><p class="summary-note">Total across inbox selections</p></article>
         </div>
       </section>
       <section class="section" id="inbox" aria-labelledby="inbox-title">
@@ -160,8 +160,8 @@
         <div class="panel table-wrap">
           {% if candidates %}
           <table>
-            <thead><tr><th scope="col">Selection</th><th class="numeric" scope="col">Audio files</th><th class="numeric" scope="col">Bytes</th></tr></thead>
-            <tbody>{% for candidate in candidates %}<tr><td class="path">{{ candidate.path }}</td><td class="numeric">{{ candidate.files }}</td><td class="numeric">{{ candidate.bytes }}</td></tr>{% endfor %}</tbody>
+            <thead><tr><th scope="col">Selection</th><th class="numeric" scope="col">Audio files</th><th class="numeric" scope="col">Size</th></tr></thead>
+            <tbody>{% for candidate in candidates %}<tr><td class="path">{{ candidate.path }}</td><td class="numeric">{{ candidate.files }}</td><td class="numeric">{{ candidate.bytes|format_bytes }}</td></tr>{% endfor %}</tbody>
           </table>
           {% else %}<div class="empty-state"><strong>Inbox is empty</strong>Add music to your configured inbox to see it here.</div>{% endif %}
         </div>
