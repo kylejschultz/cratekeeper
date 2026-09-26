@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/kylejschultz/cratekeeper:latest
+    image: ghcr.io/kylejschultz/cratekeep:latest
     build: .
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     ports:

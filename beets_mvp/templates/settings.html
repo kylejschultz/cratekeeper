@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ 'Set up' if first_run else 'Settings' }} · Cratekeeper</title>
+  <title>{{ 'Set up' if first_run else 'Settings' }} · Cratekeep</title>
   <style>
     body { font: 16px system-ui; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #222; }
     label { display: block; font-weight: 600; margin-top: 1.25rem; }
@@ -19,8 +19,8 @@
   </style>
 </head>
 <body>
-  <h1>{{ 'Set up Cratekeeper' if first_run else 'Cratekeeper settings' }}</h1>
-  {% if first_run %}<p>Choose the folders Cratekeeper will use. These settings are stored in the application database and can be changed later.</p>{% endif %}
+  <h1>{{ 'Set up Cratekeep' if first_run else 'Cratekeep settings' }}</h1>
+  {% if first_run %}<p>Choose the folders Cratekeep will use. These settings are stored in the application database and can be changed later.</p>{% endif %}
   {% for category, message in get_flashed_messages(with_categories=true) %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
   <form method="post">
     <label>Inbox path

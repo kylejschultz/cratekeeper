@@ -37,5 +37,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/kylejschultz/cratekeeper:latest
-            ghcr.io/kylejschultz/cratekeeper:${{ github.sha }}
+            ghcr.io/kylejschultz/cratekeep:latest
+            ghcr.io/kylejschultz/cratekeep:${{ github.sha }}
