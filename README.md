@@ -17,6 +17,8 @@ APP_UID="$(id -u)" APP_GID="$(id -g)" docker compose up -d
 
 Open <http://localhost:8788>. Put albums or individual audio files in `data/inbox`. Imported files are moved to `data/library`; application and beets databases are stored in `data/config`.
 
+On first launch, Cratekeeper opens a setup screen. Confirm the suggested `/data/inbox` and `/data/library` container paths and optionally enter Navidrome rescan details. The choices are stored in `data/config/app.db` and remain editable from the Settings link.
+
 When upgrading an existing Compose installation, stop the container and move the contents of `data/state` to `data/config` before starting the new image. The database filenames and formats are unchanged.
 
 The compose file uses `ghcr.io/kylejschultz/cratekeeper:latest` and also includes a local build definition. To build from your checkout, run `docker compose up -d --build`. On systems where `id` is unavailable, Compose defaults to UID/GID 1000.
@@ -32,7 +34,7 @@ Create an **Add Container** entry with these settings:
   - `/data/inbox` → an inbox share
   - `/data/library` → your music library share
   - `/data/config` → `/mnt/user/appdata/cratekeeper`
-- **Variables:** set `SECRET_KEY` to a long random value; optionally configure the Navidrome variables below
+- **Variables:** set `SECRET_KEY` to a long random value
 
 The container runs as UID 10001 by default. Ensure the mapped directories are writable by that UID, or use Unraid's container advanced settings to set an appropriate numeric user such as `99:100`.
 
@@ -48,6 +50,8 @@ mkdir -p data/inbox data/library data/config
 flask --app beets_mvp run --debug
 ```
 
+Open <http://127.0.0.1:5000> and complete the first-run setup. The form suggests the local `data/inbox` and `data/library` directories.
+
 For a production-like local process:
 
 ```sh
@@ -58,13 +62,10 @@ gunicorn --bind 127.0.0.1:8788 --workers 1 --threads 4 'beets_mvp:create_app()'
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `INBOX_PATH` | `./data/inbox` | Music staging directory. |
-| `LIBRARY_PATH` | `./data/library` | Managed beets music library. |
 | `STATE_PATH` | `./data/config` | SQLite databases and generated beets config. |
-| `BEETS_CONFIG` | `$STATE_PATH/config.yaml` | Existing beets YAML config; a minimal config is generated when absent. |
 | `SECRET_KEY` | development-only value | Flask signing key. Set a random value for normal use. |
-| `NAVIDROME_RESCAN_URL` | unset | Full URL that accepts a POST request to trigger scanning. |
-| `NAVIDROME_TOKEN` | unset | Optional bearer token sent to the rescan URL. |
+
+Inbox, library, and optional Navidrome settings are configured in the first-run setup screen and persisted in the application SQLite database. Cratekeeper manages the beets config at `$STATE_PATH/config.yaml` from those settings.
 
 ## API overview
 
@@ -100,4 +101,4 @@ python -m compileall -q beets_mvp tests
 - Imports use existing tags (`--noautotag`); there is no MusicBrainz matching, duplicate-resolution UI, artwork workflow, progress stream, undo, or delete endpoint.
 - A metadata database update occurs before its file-tag write, so a failed tag write can leave them temporarily inconsistent. Keep backups and ensure library files are writable.
 - Navidrome integration is a generic POST with optional bearer authentication and is not automatically run after imports.
-- The generated beets config is not overwritten. If storage paths change, update or remove the config intentionally.
+- Updating the library path in Settings also updates the generated beets config.

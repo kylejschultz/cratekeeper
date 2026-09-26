@@ -13,8 +13,6 @@ RUN useradd --create-home --uid 10001 app \
     && chown -R app:app /data /app
 USER app
 
-ENV INBOX_PATH=/data/inbox \
-    LIBRARY_PATH=/data/library \
-    STATE_PATH=/data/config
+ENV STATE_PATH=/data/config
 EXPOSE 8788
 CMD ["gunicorn", "--bind=0.0.0.0:8788", "--workers=1", "--threads=4", "beets_mvp:create_app()"]

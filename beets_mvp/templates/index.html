@@ -14,6 +14,7 @@
 </head>
 <body>
   <h1>Beets inbox</h1>
+  <p><a href="{{ url_for('settings') }}">Settings</a></p>
   <p>Preview imports through <code>POST /api/imports/preview</code>, then execute the returned job.</p>
   {% for message in get_flashed_messages() %}<p class="flash">{{ message }}</p>{% endfor %}
   <h2>Inbox</h2>

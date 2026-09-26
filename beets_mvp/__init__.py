@@ -5,6 +5,7 @@ import os
 import sqlite3
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,33 +16,41 @@ from flask import Flask, abort, flash, jsonify, redirect, render_template, reque
 
 AUDIO_EXTENSIONS = {".aac", ".aiff", ".alac", ".ape", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".wv"}
 EDITABLE_FIELDS = {"title", "artist", "album", "albumartist", "genre", "year", "track", "disc"}
+SETTING_KEYS = ("inbox_path", "library_path", "navidrome_rescan_url", "navidrome_token")
 
 
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
         SECRET_KEY=os.getenv("SECRET_KEY", "local-development-only"),
-        INBOX_PATH=os.getenv("INBOX_PATH", str(Path.cwd() / "data/inbox")),
-        LIBRARY_PATH=os.getenv("LIBRARY_PATH", str(Path.cwd() / "data/library")),
         STATE_PATH=os.getenv("STATE_PATH", str(Path.cwd() / "data/config")),
-        NAVIDROME_RESCAN_URL=os.getenv("NAVIDROME_RESCAN_URL", ""),
-        NAVIDROME_TOKEN=os.getenv("NAVIDROME_TOKEN", ""),
     )
     if test_config:
         app.config.update(test_config)
 
-    for key in ("INBOX_PATH", "LIBRARY_PATH", "STATE_PATH"):
-        Path(app.config[key]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["STATE_PATH"]).mkdir(parents=True, exist_ok=True)
     state_path = Path(app.config["STATE_PATH"])
     app.config["BEETS_DB"] = str(state_path / "library.db")
     app.config["APP_DB"] = str(state_path / "app.db")
-    app.config["BEETS_CONFIG"] = os.getenv("BEETS_CONFIG", str(state_path / "config.yaml"))
-    _write_beets_config(app)
-    # Point the Python API at the same explicit config as the CLI. Reading
-    # without user discovery avoids writing under ~/.config in containers.
-    beets_config.set_file(app.config["BEETS_CONFIG"])
-    beets_config.read(user=False, defaults=True)
+    app.config["BEETS_CONFIG"] = str(state_path / "config.yaml")
     _init_db(app.config["APP_DB"])
+    _apply_settings(app, _load_settings(app.config["APP_DB"]))
+
+    @app.before_request
+    def require_setup():
+        if app.config["SETUP_COMPLETE"] or request.endpoint in {"setup", "settings", "healthz", "static"}:
+            return None
+        if request.path.startswith("/api/"):
+            return jsonify(error="setup is required", setup=url_for("setup")), 503
+        return redirect(url_for("setup"))
+
+    @app.route("/setup", methods=("GET", "POST"))
+    def setup():
+        return _settings_response(app, first_run=not app.config["SETUP_COMPLETE"])
+
+    @app.route("/settings", methods=("GET", "POST"))
+    def settings():
+        return _settings_response(app, first_run=False)
 
     @app.get("/")
     def index():
@@ -169,6 +178,10 @@ def _write_beets_config(app: Flask) -> None:
 
 def _init_db(path: str) -> None:
     with _connect(path) as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )""")
         db.execute("""CREATE TABLE IF NOT EXISTS import_jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT NOT NULL,
@@ -178,6 +191,99 @@ def _init_db(path: str) -> None:
             created_at TEXT NOT NULL,
             finished_at TEXT
         )""")
+
+
+def _load_settings(path: str) -> dict[str, str]:
+    with _connect(path) as db:
+        rows = db.execute("SELECT key, value FROM app_settings").fetchall()
+    return {row["key"]: row["value"] for row in rows if row["key"] in SETTING_KEYS}
+
+
+def _save_settings(path: str, settings: dict[str, str]) -> None:
+    with _connect(path) as db:
+        db.executemany(
+            "INSERT INTO app_settings(key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [(key, settings.get(key, "")) for key in SETTING_KEYS],
+        )
+
+
+def _apply_settings(app: Flask, settings: dict[str, str]) -> None:
+    app.config.update(
+        INBOX_PATH=settings.get("inbox_path", ""),
+        LIBRARY_PATH=settings.get("library_path", ""),
+        NAVIDROME_RESCAN_URL=settings.get("navidrome_rescan_url", ""),
+        NAVIDROME_TOKEN=settings.get("navidrome_token", ""),
+    )
+    app.config["SETUP_COMPLETE"] = bool(app.config["INBOX_PATH"] and app.config["LIBRARY_PATH"])
+    if app.config["SETUP_COMPLETE"]:
+        for key in ("INBOX_PATH", "LIBRARY_PATH"):
+            Path(app.config[key]).mkdir(parents=True, exist_ok=True)
+        _write_beets_config(app)
+        # Point the Python API at the same explicit config as the CLI. Reading
+        # without user discovery avoids writing under ~/.config in containers.
+        beets_config.set_file(app.config["BEETS_CONFIG"])
+        beets_config.read(user=False, defaults=True)
+
+
+def _settings_response(app: Flask, first_run: bool):
+    current = _load_settings(app.config["APP_DB"])
+    if request.method == "POST":
+        inbox_path = request.form.get("inbox_path", "").strip()
+        library_path = request.form.get("library_path", "").strip()
+        rescan_url = request.form.get("navidrome_rescan_url", "").strip()
+        errors = []
+        if not inbox_path:
+            errors.append("Inbox path is required.")
+        if not library_path:
+            errors.append("Library path is required.")
+        parsed_rescan_url = urllib.parse.urlparse(rescan_url)
+        if rescan_url and (parsed_rescan_url.scheme not in {"http", "https"} or not parsed_rescan_url.netloc):
+            errors.append("Navidrome rescan URL must be a complete http or https URL.")
+
+        token = request.form.get("navidrome_token", "")
+        if not token and current.get("navidrome_token") and not request.form.get("clear_navidrome_token"):
+            token = current["navidrome_token"]
+        values = {
+            "inbox_path": inbox_path,
+            "library_path": library_path,
+            "navidrome_rescan_url": rescan_url,
+            "navidrome_token": token,
+        }
+        if not errors:
+            try:
+                Path(inbox_path).expanduser().mkdir(parents=True, exist_ok=True)
+                Path(library_path).expanduser().mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                errors.append(f"Could not create a configured directory: {exc}")
+        if not errors:
+            values["inbox_path"] = str(Path(inbox_path).expanduser().resolve())
+            values["library_path"] = str(Path(library_path).expanduser().resolve())
+            _save_settings(app.config["APP_DB"], values)
+            # A settings change is authoritative for the managed beets config.
+            Path(app.config["BEETS_CONFIG"]).unlink(missing_ok=True)
+            _apply_settings(app, values)
+            flash("Settings saved.")
+            return redirect(url_for("index"))
+        for error in errors:
+            flash(error, "error")
+        current = values
+
+    defaults = _default_paths()
+    return render_template(
+        "settings.html",
+        first_run=first_run,
+        settings=current,
+        default_inbox=defaults["inbox_path"],
+        default_library=defaults["library_path"],
+        has_token=bool(current.get("navidrome_token")),
+    )
+
+
+def _default_paths() -> dict[str, str]:
+    container_data = Path("/data")
+    root = container_data if (container_data / "inbox").is_dir() and (container_data / "library").is_dir() else Path.cwd() / "data"
+    return {"inbox_path": str(root / "inbox"), "library_path": str(root / "library")}
 
 
 def _connect(path: str) -> sqlite3.Connection:

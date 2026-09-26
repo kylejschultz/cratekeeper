@@ -4,13 +4,17 @@ from beets_mvp import create_app
 
 
 def make_app(tmp_path: Path):
-    return create_app({
+    app = create_app({
         "TESTING": True,
         "SECRET_KEY": "test",
-        "INBOX_PATH": str(tmp_path / "inbox"),
-        "LIBRARY_PATH": str(tmp_path / "library"),
         "STATE_PATH": str(tmp_path / "config"),
     })
+    response = app.test_client().post("/setup", data={
+        "inbox_path": str(tmp_path / "inbox"),
+        "library_path": str(tmp_path / "library"),
+    })
+    assert response.status_code == 302
+    return app
 
 
 def test_health_and_empty_lists(tmp_path):
@@ -35,6 +39,68 @@ def test_default_state_path_uses_config_directory(tmp_path, monkeypatch):
     assert app.config["APP_DB"] == str(tmp_path / "data" / "config" / "app.db")
     assert app.config["BEETS_DB"] == str(tmp_path / "data" / "config" / "library.db")
     assert app.config["BEETS_CONFIG"] == str(tmp_path / "data" / "config" / "config.yaml")
+
+
+def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
+    monkeypatch.setenv("INBOX_PATH", "/ignored/inbox")
+    monkeypatch.setenv("LIBRARY_PATH", "/ignored/library")
+    monkeypatch.setenv("NAVIDROME_RESCAN_URL", "https://ignored.invalid/scan")
+    state_path = tmp_path / "config"
+    app = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path)})
+    client = app.test_client()
+
+    assert client.get("/").headers["Location"].endswith("/setup")
+    unavailable = client.get("/api/inbox")
+    assert unavailable.status_code == 503
+    assert unavailable.json["setup"] == "/setup"
+
+    inbox = tmp_path / "chosen-inbox"
+    library = tmp_path / "chosen-library"
+    saved = client.post("/setup", data={
+        "inbox_path": str(inbox),
+        "library_path": str(library),
+        "navidrome_rescan_url": "https://music.example.test/scan",
+        "navidrome_token": "secret-token",
+    })
+    assert saved.status_code == 302
+    assert saved.headers["Location"] == "/"
+    assert inbox.is_dir()
+    assert library.is_dir()
+
+    restarted = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path)})
+    assert restarted.config["INBOX_PATH"] == str(inbox)
+    assert restarted.config["LIBRARY_PATH"] == str(library)
+    assert restarted.config["NAVIDROME_RESCAN_URL"] == "https://music.example.test/scan"
+    assert restarted.config["NAVIDROME_TOKEN"] == "secret-token"
+    assert restarted.test_client().get("/").status_code == 200
+
+
+def test_settings_update_paths_and_preserve_or_clear_token(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    client.post("/settings", data={
+        "inbox_path": str(tmp_path / "inbox"),
+        "library_path": str(tmp_path / "library"),
+        "navidrome_token": "saved-token",
+    })
+
+    new_inbox = tmp_path / "new-inbox"
+    client.post("/settings", data={
+        "inbox_path": str(new_inbox),
+        "library_path": str(tmp_path / "library"),
+        "navidrome_token": "",
+    })
+    assert app.config["INBOX_PATH"] == str(new_inbox)
+    assert app.config["NAVIDROME_TOKEN"] == "saved-token"
+    assert f'directory: "{tmp_path / "library"}"' in Path(app.config["BEETS_CONFIG"]).read_text()
+
+    client.post("/settings", data={
+        "inbox_path": str(new_inbox),
+        "library_path": str(tmp_path / "library"),
+        "navidrome_token": "",
+        "clear_navidrome_token": "1",
+    })
+    assert app.config["NAVIDROME_TOKEN"] == ""
 
 
 def test_review_then_import(tmp_path, monkeypatch):

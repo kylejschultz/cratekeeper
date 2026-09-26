@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ 'Set up' if first_run else 'Settings' }} · Cratekeeper</title>
+  <style>
+    body { font: 16px system-ui; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    label { display: block; font-weight: 600; margin-top: 1.25rem; }
+    input[type=text], input[type=password], input[type=url] { box-sizing: border-box; width: 100%; margin-top: .35rem; padding: .65rem; }
+    small { display: block; margin-top: .3rem; color: #555; }
+    button { margin-top: 1.5rem; padding: .65rem 1rem; }
+    .flash { background: #def7e5; padding: .75rem; }
+    .error { background: #fee2e2; }
+  </style>
+</head>
+<body>
+  <h1>{{ 'Set up Cratekeeper' if first_run else 'Cratekeeper settings' }}</h1>
+  {% if first_run %}<p>Choose the folders Cratekeeper will use. These settings are stored in the application database and can be changed later.</p>{% endif %}
+  {% for category, message in get_flashed_messages(with_categories=true) %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
+  <form method="post">
+    <label>Inbox path
+      <input name="inbox_path" type="text" required value="{{ settings.get('inbox_path', default_inbox) }}">
+    </label>
+    <small>Folder containing music waiting to be imported.</small>
+
+    <label>Library path
+      <input name="library_path" type="text" required value="{{ settings.get('library_path', default_library) }}">
+    </label>
+    <small>Destination folder for the managed music library.</small>
+
+    <label>Navidrome rescan URL
+      <input name="navidrome_rescan_url" type="url" value="{{ settings.get('navidrome_rescan_url', '') }}" placeholder="http://navidrome:4533/api/scan">
+    </label>
+    <small>Optional URL that accepts a POST request to trigger a scan.</small>
+
+    <label>Navidrome bearer token
+      <input name="navidrome_token" type="password" value="" autocomplete="new-password">
+    </label>
+    {% if has_token %}
+      <small>A token is saved. Leave this blank to keep it.</small>
+      <label><input name="clear_navidrome_token" type="checkbox" value="1"> Clear the saved token</label>
+    {% else %}
+      <small>Optional bearer token sent to the rescan URL.</small>
+    {% endif %}
+
+    <button type="submit">{{ 'Finish setup' if first_run else 'Save settings' }}</button>
+    {% if not first_run %}<a href="{{ url_for('index') }}">Cancel</a>{% endif %}
+  </form>
+</body>
+</html>

@@ -6,11 +6,7 @@ services:
     ports:
       - "8788:8788"
     environment:
-      INBOX_PATH: /data/inbox
-      LIBRARY_PATH: /data/library
       STATE_PATH: /data/config
-      # NAVIDROME_RESCAN_URL: http://navidrome:4533/api/scan
-      # NAVIDROME_TOKEN: replace-me
     volumes:
       - ./data/inbox:/data/inbox
       - ./data/library:/data/library
