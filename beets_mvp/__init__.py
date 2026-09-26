@@ -11,13 +11,15 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
 from beets import config as beets_config
 from beets.library import Library
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
 
 AUDIO_EXTENSIONS = {".aac", ".aiff", ".alac", ".ape", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".wv"}
 EDITABLE_FIELDS = {"title", "artist", "album", "albumartist", "genre", "year", "track", "disc"}
-SETTING_KEYS = ("inbox_path", "library_path", "navidrome_rescan_url", "navidrome_token")
+SETTING_KEYS = ("inbox_path", "library_path", "navidrome_rescan_url", "navidrome_token", "fetch_art")
+MAX_BEETS_CONFIG_BYTES = 128 * 1024
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -50,10 +52,14 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.route("/setup", methods=("GET", "POST"))
     def setup():
-        return _settings_response(app, first_run=not app.config["SETUP_COMPLETE"])
+        if app.config["SETUP_COMPLETE"]:
+            return redirect(url_for("settings"))
+        return _settings_response(app, first_run=True)
 
     @app.route("/settings", methods=("GET", "POST"))
     def settings():
+        if not app.config["SETUP_COMPLETE"]:
+            return redirect(url_for("setup"))
         return _settings_response(app, first_run=False)
 
     @app.get("/")
@@ -201,23 +207,63 @@ def _load_or_create_secret_key(path: Path) -> str:
     return key
 
 
-def _write_beets_config(app: Flask) -> None:
+def _write_beets_config(app: Flask, content: str | None = None) -> None:
     path = Path(app.config["BEETS_CONFIG"])
-    if path.exists():
+    if path.exists() and content is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    content = "\n".join([
-        f"directory: {json.dumps(str(Path(app.config['LIBRARY_PATH']).resolve()))}",
-        f"library: {json.dumps(str(Path(app.config['BEETS_DB']).resolve()))}",
-        "import:",
-        "  move: true",
-        "  write: true",
-        "  autotag: false",
-        "  resume: false",
-        "plugins: []",
-        "",
-    ])
-    path.write_text(content, encoding="utf-8")
+    if content is None:
+        content = _build_beets_config(app, {}, "", False)
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    try:
+        temporary.write_text(content, encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _build_beets_config(app: Flask, settings: dict[str, str], content: str, fetch_art: bool) -> str:
+    if len(content.encode("utf-8")) > MAX_BEETS_CONFIG_BYTES:
+        raise ValueError("Beets configuration must be smaller than 128 KB.")
+    try:
+        document = yaml.safe_load(content) if content.strip() else {}
+    except yaml.YAMLError as exc:
+        detail = str(exc).splitlines()[0]
+        raise ValueError(f"Beets configuration is not valid YAML: {detail}") from exc
+    if not isinstance(document, dict):
+        raise ValueError("Beets configuration must be a YAML mapping.")
+
+    import_config = document.get("import", {})
+    if import_config is None:
+        import_config = {}
+    if not isinstance(import_config, dict):
+        raise ValueError("The beets import section must be a YAML mapping.")
+    import_config.update(move=True, write=True, autotag=False, resume=False)
+
+    plugins = document.get("plugins", [])
+    if isinstance(plugins, str):
+        plugins = plugins.split()
+    if plugins is None:
+        plugins = []
+    if not isinstance(plugins, list) or any(not isinstance(plugin, str) for plugin in plugins):
+        raise ValueError("The beets plugins setting must be a list or space-separated string.")
+    plugins = list(dict.fromkeys(plugin for plugin in plugins if plugin != "fetchart"))
+    if fetch_art:
+        plugins.append("fetchart")
+
+    library_path = settings.get("library_path") or app.config.get("LIBRARY_PATH", "")
+    document["directory"] = str(Path(library_path).expanduser().resolve())
+    document["library"] = str(Path(app.config["BEETS_DB"]).resolve())
+    document["import"] = import_config
+    document["plugins"] = plugins
+    rendered = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+    lines = rendered.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("directory:"):
+            lines[index] = f"directory: {json.dumps(document['directory'])}"
+        elif line.startswith("library:"):
+            lines[index] = f"library: {json.dumps(document['library'])}"
+    return "\n".join(lines) + "\n"
 
 
 def _init_db(path: str) -> None:
@@ -258,20 +304,21 @@ def _apply_settings(app: Flask, settings: dict[str, str]) -> None:
         LIBRARY_PATH=settings.get("library_path", ""),
         NAVIDROME_RESCAN_URL=settings.get("navidrome_rescan_url", ""),
         NAVIDROME_TOKEN=settings.get("navidrome_token", ""),
+        FETCH_ART=settings.get("fetch_art", "") == "1",
     )
     app.config["SETUP_COMPLETE"] = bool(app.config["INBOX_PATH"] and app.config["LIBRARY_PATH"])
     if app.config["SETUP_COMPLETE"]:
         for key in ("INBOX_PATH", "LIBRARY_PATH"):
             Path(app.config[key]).mkdir(parents=True, exist_ok=True)
         _write_beets_config(app)
-        # Point the Python API at the same explicit config as the CLI. Reading
-        # without user discovery avoids writing under ~/.config in containers.
         beets_config.set_file(app.config["BEETS_CONFIG"])
         beets_config.read(user=False, defaults=True)
 
 
 def _settings_response(app: Flask, first_run: bool):
     current = _load_settings(app.config["APP_DB"])
+    config_path = Path(app.config["BEETS_CONFIG"])
+    config_text = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
     if request.method == "POST":
         inbox_path = request.form.get("inbox_path", "").strip()
         library_path = request.form.get("library_path", "").strip()
@@ -298,7 +345,15 @@ def _settings_response(app: Flask, first_run: bool):
             "library_path": library_path,
             "navidrome_rescan_url": rescan_url,
             "navidrome_token": token,
+            "fetch_art": "1" if request.form.get("fetch_art") else "",
         }
+        submitted_config = request.form.get("beets_config", config_text)
+        rendered_config = None
+        if not first_run:
+            try:
+                rendered_config = _build_beets_config(app, values, submitted_config, values["fetch_art"] == "1")
+            except ValueError as exc:
+                errors.append(str(exc))
         if not errors:
             try:
                 Path(inbox_path).expanduser().mkdir(parents=True, exist_ok=True)
@@ -308,15 +363,17 @@ def _settings_response(app: Flask, first_run: bool):
         if not errors:
             values["inbox_path"] = str(Path(inbox_path).expanduser().resolve())
             values["library_path"] = str(Path(library_path).expanduser().resolve())
+            if first_run:
+                rendered_config = _build_beets_config(app, values, "", values["fetch_art"] == "1")
+            _write_beets_config(app, rendered_config)
             _save_settings(app.config["APP_DB"], values)
-            # A settings change is authoritative for the managed beets config.
-            Path(app.config["BEETS_CONFIG"]).unlink(missing_ok=True)
             _apply_settings(app, values)
             flash("Settings saved.")
             return redirect(url_for("index"))
         for error in errors:
             flash(error, "error")
         current = values
+        config_text = submitted_config
 
     defaults = _default_paths()
     return render_template(
@@ -326,6 +383,7 @@ def _settings_response(app: Flask, first_run: bool):
         default_inbox=defaults["inbox_path"],
         default_library=defaults["library_path"],
         has_token=bool(current.get("navidrome_token")),
+        beets_config=config_text,
     )
 
 

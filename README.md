@@ -69,7 +69,7 @@ gunicorn --bind 127.0.0.1:8788 --workers 1 --threads 4 'beets_mvp:create_app()'
 | `STATE_PATH` | `./data/config` | SQLite databases and generated beets config. |
 | `SECRET_KEY` | generated in `$STATE_PATH/secret.key` | Optional override for advanced deployments. The generated key is retained across restarts when `$STATE_PATH` is mounted persistently. |
 
-Inbox, library, and optional Navidrome settings are configured in the first-run setup screen and persisted in the application SQLite database. Cratekeep manages the beets config at `$STATE_PATH/config.yaml` from those settings.
+Inbox and library paths are chosen during first-run setup. The in-app Settings page also manages optional Navidrome details, an explicit artwork-fetching opt-in, and an advanced YAML editor for `$STATE_PATH/config.yaml`. On save, Cratekeep validates and normalizes the YAML; library/database paths, core import safety options, and `fetchart` plugin state remain controlled by the form.
 
 ## API overview
 
@@ -106,5 +106,5 @@ python -m compileall -q beets_mvp tests
 - Imports use existing tags (`--noautotag`); there is no MusicBrainz matching, duplicate-resolution UI, artwork workflow, progress stream, undo, or delete endpoint.
 - A metadata database update occurs before its file-tag write, so a failed tag write can leave them temporarily inconsistent. Keep backups and ensure library files are writable.
 - Navidrome integration is a generic POST with optional bearer authentication and is not automatically run after imports.
-- Updating the library path in Settings also updates the generated beets config.
+- Artwork fetching is disabled by default and is enabled only through the Settings checkbox.
 - The Flask signing key is generated on first boot and stored as `$STATE_PATH/secret.key`; keep the config volume persistent. It is not displayed in the UI because Cratekeep does not yet have authentication.

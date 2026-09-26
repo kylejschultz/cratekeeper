@@ -6,16 +6,16 @@
   <title>{{ 'Set up' if first_run else 'Settings' }} · Cratekeep</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --page: #eef3f7;
+      color-scheme: light;
+      --page: #f5f6f8;
       --surface: #fff;
-      --text: #243442;
-      --muted: #5b6c79;
-      --border: #a9bac7;
-      --accent: #315f7d;
-      --accent-hover: #244b65;
-      --focus: #1876b2;
-      --success: #dcefe5;
+      --text: #20252b;
+      --muted: #687078;
+      --border: #d8dce1;
+      --accent: #475569;
+      --accent-hover: #334155;
+      --focus: #64748b;
+      --success: #e8f3ec;
       --error: #f7dddd;
       --overlay: rgb(12 27 38 / 68%);
       --modal-surface: #f7f8f8;
@@ -31,7 +31,7 @@
     .logo { display: block; width: 112px; height: auto; margin: 0 auto 1rem; }
     h1 { margin-top: 0; color: var(--accent); }
     label { display: block; font-weight: 600; margin-top: 1.25rem; }
-    input[type=text], input[type=password], input[type=url], select { width: 100%; margin-top: .35rem; padding: .65rem; color: var(--text); border: 1px solid var(--border); border-radius: .3rem; background: var(--surface); }
+    input[type=text], input[type=password], input[type=url], select, textarea { width: 100%; margin-top: .35rem; padding: .65rem; color: var(--text); border: 1px solid var(--border); border-radius: .3rem; background: var(--surface); font: inherit; }
     .path-picker { display: flex; gap: .5rem; margin-top: .35rem; }
     .path-picker input { flex: 1; margin-top: 0; }
     small { display: block; margin-top: .3rem; color: var(--muted); }
@@ -78,32 +78,26 @@
     .browser-actions .secondary { border-color: var(--modal-border); background: var(--modal-panel); color: var(--text); }
     .browser-actions .secondary:hover { background: var(--modal-surface); }
     body.modal-open { overflow: hidden; }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --page: #17232c;
-        --surface: #202f3a;
-        --text: #e4edf3;
-        --muted: #b7c5cf;
-        --border: #526b7d;
-        --accent: #8ab8d4;
-        --accent-hover: #376d8e;
-        --focus: #70c7fa;
-        --success: #244b3a;
-        --error: #572f35;
-        --modal-surface: #222b31;
-        --modal-panel: #29343b;
-        --modal-border: #526169;
-        --modal-subtle: #303c43;
-        --modal-accent: #759aae;
-        --modal-accent-hover: #5f879d;
-      }
-      button { color: #10202a; }
-      button:hover { color: #fff; }
-      .browser-body button:not(.directory-row), .browser-actions button:not(.secondary) { color: #10202a; }
-      .browser-status.error-text { color: #ffadb5; }
-    }
+    .app-mode { max-width:none; margin:0; padding:0 0 0 13.5rem; min-height:100vh; }
+    .app-mode .app-sidebar { position:fixed; inset:0 auto 0 0; width:13.5rem; padding:1.1rem .8rem; border-right:1px solid var(--border); background:#fff; }
+    .side-brand { display:flex; align-items:center; gap:.65rem; padding:.2rem .45rem 1rem; font-weight:700; }
+    .side-brand img { width:2rem; height:2rem; object-fit:contain; }
+    .side-nav { display:grid; gap:.2rem; }
+    .side-nav a { padding:.55rem .65rem; border-radius:.3rem; color:var(--muted); text-decoration:none; font-size:.9rem; }
+    .side-nav a:hover,.side-nav a[aria-current=page] { color:var(--text); background:#f1f3f5; }
+    .app-mode main { width:min(960px,100%); margin:0 auto; padding:2rem; border:0; border-radius:0; background:transparent; box-shadow:none; }
+    .app-mode .logo { display:none; }
+    .page-head { margin-bottom:1.25rem; }
+    .page-head h1 { margin:0; color:var(--text); font-size:1.65rem; }
+    .page-head p { margin:.3rem 0 0; color:var(--muted); }
+    .settings-section { margin-top:1rem; padding:1.25rem; border:1px solid var(--border); border-radius:.45rem; background:#fff; box-shadow:0 1px 2px rgb(15 23 42 / 4%); }
+    .settings-section h2 { margin:0; font-size:1rem; }
+    .settings-section > p { margin:.25rem 0 0; color:var(--muted); font-size:.9rem; }
+    textarea { min-height:19rem; resize:vertical; font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .check-label { display:flex; align-items:flex-start; gap:.55rem; font-weight:500; }
     @media (max-width: 520px) {
       body { margin: 0; padding: .75rem; }
+      .app-mode { padding:.75rem; } .app-mode .app-sidebar { position:static; width:auto; margin:-.75rem -.75rem 1rem; border-right:0; border-bottom:1px solid var(--border); } .app-mode main { padding:0; }
       .path-picker { align-items: stretch; flex-direction: column; }
       .browser { padding: .4rem; }
       .browser-dialog { max-height: calc(100vh - .8rem); }
@@ -112,44 +106,57 @@
     }
   </style>
 </head>
-<body>
-<main>
-  <img class="logo" src="{{ url_for('static', filename='cratekeep-logo.png') }}" alt="Cratekeep">
-  <h1>{{ 'Set up Cratekeep' if first_run else 'Cratekeep settings' }}</h1>
-  {% if first_run %}<p>Choose the folders Cratekeep will use. These settings are stored in the application database and can be changed later.</p>{% endif %}
+<body class="{{ 'setup-mode' if first_run else 'app-mode' }}">
+{% if not first_run %}
+<aside class="app-sidebar" aria-label="Application sidebar">
+  <div class="side-brand"><img src="{{ url_for('static', filename='cratekeep-logo.png') }}" alt=""><span>Cratekeep</span></div>
+  <nav class="side-nav" aria-label="Primary navigation">
+    <a href="{{ url_for('index') }}">Overview</a>
+    <a href="{{ url_for('index') }}#inbox">Inbox</a>
+    <a href="{{ url_for('index') }}#library">Library</a>
+    <a href="{{ url_for('settings') }}" aria-current="page">Settings</a>
+  </nav>
+</aside>
+{% endif %}
+<main id="main-content">
+  {% if first_run %}
+    <img class="logo" src="{{ url_for('static', filename='cratekeep-logo.png') }}" alt="Cratekeep">
+    <h1>Set up Cratekeep</h1>
+    <p>Choose the inbox and library folders for this installation. You can fine-tune integrations later from the in-app Settings page.</p>
+  {% else %}
+    <header class="page-head"><h1>Settings</h1><p>Manage storage, integrations, and the active beets configuration.</p></header>
+  {% endif %}
   {% for category, message in get_flashed_messages(with_categories=true) %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
   <form method="post">
-    <label>Inbox path
-      <div class="path-picker">
-        <input id="inbox_path" name="inbox_path" type="text" required value="{{ settings.get('inbox_path', default_inbox) }}">
-        <button type="button" data-open-picker="inbox_path">Browse</button>
-      </div>
-    </label>
-    <small>Folder containing music waiting to be imported.</small>
-
-    <label>Library path
-      <div class="path-picker">
-        <input id="library_path" name="library_path" type="text" required value="{{ settings.get('library_path', default_library) }}">
-        <button type="button" data-open-picker="library_path">Browse</button>
-      </div>
-    </label>
-    <small>Destination folder for the managed music library.</small>
-
-    <label>Navidrome rescan URL
-      <input name="navidrome_rescan_url" type="url" value="{{ settings.get('navidrome_rescan_url', '') }}" placeholder="http://navidrome:4533/api/scan">
-    </label>
-    <small>Optional URL that accepts a POST request to trigger a scan.</small>
-
-    <label>Navidrome bearer token
-      <input name="navidrome_token" type="password" value="" autocomplete="new-password">
-    </label>
-    {% if has_token %}
-      <small>A token is saved. Leave this blank to keep it.</small>
-      <label><input name="clear_navidrome_token" type="checkbox" value="1"> Clear the saved token</label>
-    {% else %}
-      <small>Optional bearer token sent to the rescan URL.</small>
+    <section class="settings-section" aria-labelledby="storage-title">
+      {% if not first_run %}<h2 id="storage-title">Storage</h2><p>Container paths used for incoming and organized music.</p>{% endif %}
+      <label>Inbox path
+        <div class="path-picker"><input id="inbox_path" name="inbox_path" type="text" required value="{{ settings.get('inbox_path', default_inbox) }}"><button type="button" data-open-picker="inbox_path">Browse</button></div>
+      </label><small>Folder containing music waiting to be imported.</small>
+      <label>Library path
+        <div class="path-picker"><input id="library_path" name="library_path" type="text" required value="{{ settings.get('library_path', default_library) }}"><button type="button" data-open-picker="library_path">Browse</button></div>
+      </label><small>Destination folder for the managed music library.</small>
+    </section>
+    {% if not first_run %}
+    <section class="settings-section" aria-labelledby="artwork-title">
+      <h2 id="artwork-title">Artwork</h2><p>Artwork downloading is off unless explicitly enabled.</p>
+      <label class="check-label"><input name="fetch_art" type="checkbox" value="1"{% if settings.get('fetch_art') == '1' %} checked{% endif %}> Fetch album artwork during beets operations</label>
+    </section>
     {% endif %}
-
+    <section class="settings-section" aria-labelledby="navidrome-title">
+      <h2 id="navidrome-title">Navidrome</h2><p>Optional rescan integration.</p>
+      <label>Rescan URL<input name="navidrome_rescan_url" type="url" value="{{ settings.get('navidrome_rescan_url', '') }}" placeholder="http://navidrome:4533/api/scan"></label><small>Complete URL that accepts a POST request.</small>
+      <label>Bearer token<input name="navidrome_token" type="password" value="" autocomplete="new-password"></label>
+      {% if has_token %}<small>A token is saved. Leave blank to keep it.</small><label class="check-label"><input name="clear_navidrome_token" type="checkbox" value="1"> Clear the saved token</label>{% else %}<small>Optional token sent to the rescan URL.</small>{% endif %}
+    </section>
+    {% if not first_run %}
+    <section class="settings-section" aria-labelledby="beets-title">
+      <h2 id="beets-title">Beets configuration</h2>
+      <p>Edit advanced options in the generated <code>config.yaml</code>. Library/database paths, core import safety settings, and the fetchart plugin state are managed by the form and will be normalized when saved.</p>
+      <label for="beets_config">YAML configuration</label>
+      <textarea id="beets_config" name="beets_config" spellcheck="false">{{ beets_config }}</textarea>
+    </section>
+    {% endif %}
     <button type="submit">{{ 'Finish setup' if first_run else 'Save settings' }}</button>
     {% if not first_run %}<a href="{{ url_for('index') }}">Cancel</a>{% endif %}
   </form>

@@ -274,3 +274,99 @@ def test_rejects_path_escape(tmp_path):
     client = make_app(tmp_path).test_client()
     response = client.post("/api/imports/preview", json={"path": "../outside"})
     assert response.status_code == 400
+
+def test_normal_settings_renders_in_app_page_and_beets_editor(tmp_path):
+    page = make_app(tmp_path).test_client().get("/settings")
+
+    assert page.status_code == 200
+    assert b'class="app-mode"' in page.data
+    assert b'aria-label="Primary navigation"' in page.data
+    assert b'aria-current="page">Settings' in page.data
+    assert b'<h1>Settings</h1>' in page.data
+    assert b'Set up Cratekeep' not in page.data
+    assert b'id="beets_config"' in page.data
+    assert b'core import safety settings' in page.data
+    assert b'name="fetch_art"' in page.data
+    assert b'name="fetch_art" type="checkbox" value="1" checked' not in page.data
+
+
+def test_settings_persists_valid_beets_config_and_managed_values(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    new_library = tmp_path / "new-library"
+
+    response = client.post("/settings", data={
+        "inbox_path": str(tmp_path / "inbox"),
+        "library_path": str(new_library),
+        "fetch_art": "1",
+        "beets_config": "directory: /ignored\nlibrary: /ignored.db\nimport:\n  move: false\n  quiet: true\nplugins: [lastgenre]\npaths:\n  default: $albumartist/$album\n",
+    })
+
+    assert response.status_code == 302
+    config = Path(app.config["BEETS_CONFIG"]).read_text()
+    assert f'directory: "{new_library}"' in config
+    assert f'library: "{tmp_path / "config" / "library.db"}"' in config
+    assert "move: true" in config
+    assert "quiet: true" in config
+    assert "- lastgenre" in config
+    assert "- fetchart" in config
+    assert "default: $albumartist/$album" in config
+
+    restarted = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "test",
+        "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(tmp_path)],
+    })
+    restarted_page = restarted.test_client().get("/settings")
+    assert restarted.config["FETCH_ART"] is True
+    assert b'name="fetch_art" type="checkbox" value="1" checked' in restarted_page.data
+
+
+def test_invalid_beets_config_is_rejected_without_persisting(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    config_path = Path(app.config["BEETS_CONFIG"])
+    original = config_path.read_text()
+
+    response = client.post("/settings", data={
+        "inbox_path": str(tmp_path / "changed-inbox"),
+        "library_path": str(tmp_path / "library"),
+        "beets_config": "import: [not, a, mapping]",
+    })
+
+    assert response.status_code == 200
+    assert b'The beets import section must be a YAML mapping.' in response.data
+    assert config_path.read_text() == original
+    assert app.config["INBOX_PATH"] == str(tmp_path / "inbox")
+
+
+def test_dashboard_uses_compact_light_admin_visual_contract(tmp_path):
+    page = make_app(tmp_path).test_client().get("/")
+
+    assert b"color-scheme:light" in page.data
+    assert b"width:13.5rem" in page.data
+    assert b"border-right:1px solid var(--soft)" in page.data
+    assert b"box-shadow:0 1px 2px" in page.data
+    assert b"prefers-color-scheme:dark" not in page.data
+
+
+def test_setup_and_settings_routes_have_distinct_lifecycle_pages(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "test",
+        "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(tmp_path)],
+    })
+    client = app.test_client()
+
+    assert client.get("/settings").headers["Location"].endswith("/setup")
+    setup_page = client.get("/setup")
+    assert b'class="setup-mode"' in setup_page.data
+    assert b'Set up Cratekeep' in setup_page.data
+
+    client.post("/setup", data={
+        "inbox_path": str(tmp_path / "inbox"),
+        "library_path": str(tmp_path / "library"),
+    })
+    assert client.get("/setup").headers["Location"].endswith("/settings")
