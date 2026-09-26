@@ -38,7 +38,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.before_request
     def require_setup():
-        if app.config["SETUP_COMPLETE"] or request.endpoint in {"setup", "settings", "healthz", "static"}:
+        if app.config["SETUP_COMPLETE"] or request.endpoint in {"setup", "settings", "browse", "healthz", "static"}:
             return None
         if request.path.startswith("/api/"):
             return jsonify(error="setup is required", setup=url_for("setup")), 503
@@ -59,6 +59,20 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/healthz")
     def healthz():
         return jsonify(status="ok")
+
+    @app.get("/api/browse")
+    def browse():
+        requested = request.args.get("path", "")
+        try:
+            directory = _safe_browse_path(app, requested)
+        except ValueError as exc:
+            abort(400, str(exc))
+        entries = []
+        for entry in sorted(directory.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())):
+            if entry.is_dir() and not entry.is_symlink():
+                entries.append({"name": entry.name, "path": str(entry)})
+        parent = _browse_parent(app, directory)
+        return jsonify(path=str(directory), parent=parent, entries=entries)
 
     @app.get("/api/inbox")
     def inbox():
@@ -237,6 +251,11 @@ def _settings_response(app: Flask, first_run: bool):
             errors.append("Inbox path is required.")
         if not library_path:
             errors.append("Library path is required.")
+        for label, value in (("Inbox", inbox_path), ("Library", library_path)):
+            if value:
+                candidate = Path(value).expanduser().resolve()
+                if not any(candidate == root or root in candidate.parents for root in _browse_roots(app)):
+                    errors.append(f"{label} path must be inside a mounted directory shown by Browse.")
         parsed_rescan_url = urllib.parse.urlparse(rescan_url)
         if rescan_url and (parsed_rescan_url.scheme not in {"http", "https"} or not parsed_rescan_url.netloc):
             errors.append("Navidrome rescan URL must be a complete http or https URL.")
@@ -284,6 +303,37 @@ def _default_paths() -> dict[str, str]:
     container_data = Path("/data")
     root = container_data if (container_data / "inbox").is_dir() and (container_data / "library").is_dir() else Path.cwd() / "data"
     return {"inbox_path": str(root / "inbox"), "library_path": str(root / "library")}
+
+
+def _browse_roots(app: Flask) -> list[Path]:
+    configured = app.config.get("BROWSE_ROOTS")
+    candidates = configured or ("/data", "/userMedia", "/media", "/mnt", str(Path.cwd() / "data"))
+    roots = []
+    for candidate in candidates:
+        path = Path(candidate).expanduser().resolve()
+        if path.is_dir() and path not in roots:
+            roots.append(path)
+    return roots
+
+
+def _safe_browse_path(app: Flask, requested: str) -> Path:
+    if not requested:
+        roots = _browse_roots(app)
+        if not roots:
+            raise ValueError("no browseable mounted directories are available")
+        return roots[0]
+    path = Path(requested).expanduser().resolve()
+    if not path.is_dir() or not any(path == root or root in path.parents for root in _browse_roots(app)):
+        raise ValueError("path is not inside a browseable mounted directory")
+    return path
+
+
+def _browse_parent(app: Flask, directory: Path) -> str | None:
+    roots = _browse_roots(app)
+    if directory in roots:
+        return None
+    parent = directory.parent
+    return str(parent) if any(parent == root or root in parent.parents for root in roots) else None
 
 
 def _connect(path: str) -> sqlite3.Connection:

@@ -8,6 +8,7 @@ def make_app(tmp_path: Path):
         "TESTING": True,
         "SECRET_KEY": "test",
         "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(tmp_path)],
     })
     response = app.test_client().post("/setup", data={
         "inbox_path": str(tmp_path / "inbox"),
@@ -46,7 +47,7 @@ def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
     monkeypatch.setenv("LIBRARY_PATH", "/ignored/library")
     monkeypatch.setenv("NAVIDROME_RESCAN_URL", "https://ignored.invalid/scan")
     state_path = tmp_path / "config"
-    app = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path)})
+    app = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path), "BROWSE_ROOTS": [str(tmp_path)]})
     client = app.test_client()
 
     assert client.get("/").headers["Location"].endswith("/setup")
@@ -67,12 +68,31 @@ def test_first_run_requires_and_persists_setup(tmp_path, monkeypatch):
     assert inbox.is_dir()
     assert library.is_dir()
 
-    restarted = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path)})
+    restarted = create_app({"TESTING": True, "SECRET_KEY": "test", "STATE_PATH": str(state_path), "BROWSE_ROOTS": [str(tmp_path)]})
     assert restarted.config["INBOX_PATH"] == str(inbox)
     assert restarted.config["LIBRARY_PATH"] == str(library)
     assert restarted.config["NAVIDROME_RESCAN_URL"] == "https://music.example.test/scan"
     assert restarted.config["NAVIDROME_TOKEN"] == "secret-token"
     assert restarted.test_client().get("/").status_code == 200
+
+
+def test_browse_is_limited_to_configured_mount_roots(tmp_path):
+    mounted = tmp_path / "mounted"
+    (mounted / "inbox").mkdir(parents=True)
+    (mounted / "library").mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    app = create_app({
+        "TESTING": True,
+        "SECRET_KEY": "test",
+        "STATE_PATH": str(tmp_path / "config"),
+        "BROWSE_ROOTS": [str(mounted)],
+    })
+    client = app.test_client()
+    root = client.get("/api/browse")
+    assert root.status_code == 200
+    assert {entry["name"] for entry in root.json["entries"]} == {"inbox", "library"}
+    assert client.get(f"/api/browse?path={outside}").status_code == 400
 
 
 def test_settings_update_paths_and_preserve_or_clear_token(tmp_path):
